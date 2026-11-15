@@ -1,0 +1,107 @@
+{
+  "cenario": {
+    "id": 2,
+    "descricao": "MESMO documento (VCN) para líder técnico, em resumo executivo.",
+    "documento_fonte": "oci_vcn_arquitetura_de_redes.md",
+    "formato_ingestao": "markdown",
+    "duracao_segundos": 53.5
+  },
+  "requisicao": {
+    "documento_titulo": "oci vcn arquitetura de redes",
+    "documento_conteudo": "# Arquitetura de Redes na Oracle Cloud Infrastructure: a Virtual Cloud Network (VCN)\n\n## O que é uma VCN\n\nA Virtual Cloud Network (VCN) é uma rede privada e personalizável configurada na\nOracle Cloud Infrastructure. Semelhante a uma rede de data center tradicional, a\nVCN oferece controle total sobre o ambiente de rede, incluindo sub-redes públicas\ne privadas, tabelas de roteamento, gateways e listas de segurança.\n\nUma VCN existe dentro de uma única região da OCI, mas abrange todos os domínios\nde disponibilidade dessa região. Ao criar a VCN, define-se um bloco de endereços\nno formato CIDR (Classless Inter-Domain Routing), que delimita a faixa de\nendereços IP privados disponíveis para todos os recursos que serão conectados a\nela. Esse bloco não pode se sobrepor ao de outras redes com as quais a VCN\nprecise se comunicar, sob pena de conflito de roteamento.\n\n## Sub-redes\n\nA VCN é subdividida em sub-redes. Cada sub-rede recebe um subconjunto do bloco\nCIDR da VCN e funciona como uma unidade de organização e de controle de acesso.\n\nExistem dois tipos de sub-rede:\n\n- Sub-rede pública: os recursos nela podem receber endereços IP públicos e,\n portanto, ser alcançados diretamente da internet, desde que o roteamento e as\n regras de segurança permitam.\n- Sub-rede privada: os recursos não recebem endereço IP público. Essa é a\n escolha padrão para bancos de dados, filas e serviços internos que nunca devem\n ser expostos diretamente.\n\nUma sub-rede pode ser regional (abrangendo toda a região) ou específica de um\ndomínio de disponibilidade. Sub-redes regionais são a recomendação atual, porque\nsimplificam o desenho de alta disponibilidade.\n\n## Gateways\n\nOs gateways conectam a VCN ao mundo externo. Cada tipo serve a um propósito\ndistinto:\n\n- Internet Gateway: permite tráfego bidirecional entre a sub-rede pública e\n a internet. Só faz sentido em sub-redes públicas.\n- NAT Gateway: permite que recursos de uma sub-rede privada iniciem conexões\n de saída para a internet, por exemplo para baixar atualizações de pacotes, sem\n que esses recursos se tornem alcançáveis de fora. O tráfego de entrada não\n solicitado continua bloqueado.\n- Service Gateway: dá acesso privado a serviços da própria Oracle, como\n Object Storage, sem que o tráfego trafegue pela internet pública. Além do ganho\n de segurança, evita custo de saída de dados.\n- Dynamic Routing Gateway (DRG): conecta a VCN a redes externas privadas,\n como o data center da empresa via VPN IPSec ou FastConnect, e também a outras\n VCNs.\n- Local Peering Gateway: conecta duas VCNs da mesma região diretamente.\n\n## Tabelas de roteamento\n\nCada sub-rede está associada a uma tabela de roteamento, que contém regras\nindicando para qual gateway enviar o tráfego destinado a um determinado bloco\nCIDR. O roteamento dentro da própria VCN é implícito: recursos de sub-redes\ndiferentes da mesma VCN se comunicam sem necessidade de regra explícita.\n\nUma regra de rota típica de uma sub-rede privada envia todo o tráfego destinado a\n0.0.0.0/0 para o NAT Gateway. Em uma sub-rede pública, a mesma rota aponta para o\nInternet Gateway.\n\n## Security Lists e Network Security Groups\n\nO controle de tráfego na OCI acontece em duas camadas complementares.\n\nAs Security Lists são listas de regras associadas à sub-rede. Toda instância\ndentro daquela sub-rede herda as mesmas regras. As regras se dividem em:\n\n- Regras de entrada (ingress): definem qual tráfego pode chegar aos recursos.\n- Regras de saída (egress): definem qual tráfego pode sair dos recursos.\n\nCada regra especifica protocolo, porta e origem ou destino. As regras podem ser\ncom estado (stateful) ou sem estado (stateless). Em uma regra com estado, a OCI\nrastreia a conexão e libera automaticamente o tráfego de resposta, o que dispensa\ncriar uma regra inversa. Em uma regra sem estado, é necessário declarar\nexplicitamente as duas direções.\n\nOs Network Security Groups (NSG) oferecem controle mais granular: em vez de\nvaler para a sub-rede inteira, as regras se aplicam a um conjunto nomeado de\nplacas de rede virtuais. Isso permite, por exemplo, que servidores de aplicação e\nservidores de banco de dados convivam na mesma sub-rede com regras diferentes. Um\nNSG pode referenciar outro NSG como origem, o que elimina a necessidade de fixar\nendereços IP nas regras.\n\nQuando uma Security List e um NSG se aplicam ao mesmo recurso, a união das regras\né avaliada: basta que uma delas permita o tráfego para que ele seja aceito.\n\n## Resolução de nomes\n\nA VCN inclui um resolvedor DNS privado. Ao criar a VCN e as sub-redes, é possível\ndefinir rótulos de DNS que compõem nomes de host internos previsíveis, permitindo\nque os recursos se encontrem por nome em vez de por endereço IP.\n\n## Padrão de arquitetura de referência\n\nO desenho mais comum para uma aplicação web na OCI usa duas camadas de sub-rede:\n\n1. Uma sub-rede pública regional contendo o balanceador de carga, protegida por\n regras de entrada que liberam apenas as portas 80 e 443.\n2. Uma sub-rede privada regional contendo as instâncias de aplicação e o banco de\n dados, com rota de saída pelo NAT Gateway e acesso ao Object Storage pelo\n Service Gateway.\n\nNesse desenho, nenhuma instância de aplicação tem endereço IP público. O único\nponto de entrada é o balanceador de carga, o que reduz drasticamente a superfície\nde exposição e simplifica a auditoria de segurança.\n\n## Boas práticas\n\n- Planeje o bloco CIDR antes de criar a VCN. Alterar o endereçamento depois, com\n recursos em produção, é trabalhoso e arriscado.\n- Mantenha bancos de dados sempre em sub-rede privada.\n- Prefira Network Security Groups a Security Lists quando precisar de regras\n diferentes para recursos que compartilham a mesma sub-rede.\n- Use o Service Gateway para acessar serviços da Oracle, em vez de rotear esse\n tráfego pela internet.\n- Aplique o princípio do menor privilégio nas regras de entrada: libere apenas as\n portas e origens estritamente necessárias.\n- Documente cada regra de segurança. Uma regra sem justificativa registrada tende\n a permanecer para sempre, mesmo depois de perder a finalidade.",
+    "perfil_destinatario": "Líder Técnico / Arquiteto",
+    "formato_saida": "Resumo Executivo",
+    "nicho_setor": "Fintech",
+    "nivel_detalhe": "Aprofundado"
+  },
+  "resposta": {
+    "status": "sucesso",
+    "metadados": {
+      "perfil_aplicado": "Líder Técnico / Arquiteto",
+      "formato_gerado": "Resumo Executivo",
+      "tempo_estimado_estudo_minutos": 10,
+      "conceitos_chave": [
+        "Virtual Cloud Network (VCN)",
+        "Sub-redes Públicas e Privadas",
+        "Gateways de Comunicação",
+        "Security Lists e Network Security Groups"
+      ],
+      "pre_requisitos": [
+        "Fundamentos de redes (endereçamento IP, CIDR e roteamento)",
+        "Conceitos básicos de arquitetura em nuvem",
+        "Noções de segurança da informação e zonas de confiança"
+      ]
+    },
+    "conteudo_adaptado": {
+      "titulo": "Arquitetura de VCN na OCI: Estruturação de Redes Seguras para Ambientes Financeiros",
+      "introducao_contextualizada": "Para líderes técnicos e arquitetos no setor de Fintech, a arquitetura de rede na Oracle Cloud Infrastructure (OCI) exige controle rígido de tráfego e isolamento de recursos críticos. A Virtual Cloud Network (VCN) estabelece um percurso privado e personalizável dentro de uma região, permitindo segmentar workloads como processamento de pagamentos e bancos de dados em sub-redes isoladas. Este resumo aborda os componentes centrais, estratégias de roteamento e controles de segurança para mitigar a superfície de exposição.",
+      "itens": [
+        {
+          "topico": "Definição de Bloco CIDR e Escopo Regional",
+          "descricao": "A VCN delimita uma faixa de endereços IP privados no formato CIDR abrangendo todos os domínios de disponibilidade de uma região OCI. O planejamento do bloco deve prevenir sobreposições com redes externas que precisem se comunicar com a VCN.",
+          "impacto_negocio": "Evita conflitos de roteamento e impede paralisações ou retrabalho ao integrar a nuvem com redes corporativas e parceiros do ecossistema financeiro."
+        },
+        {
+          "topico": "Segmentação de Arquitetura em Camadas de Sub-rede",
+          "descricao": "Divide-se a VCN em sub-redes públicas e privadas. O padrão de referência situa o balanceador de carga na sub-rede pública e isola instâncias de aplicação e bancos de dados na sub-rede privada, sem IP público diretamente associado.",
+          "impacto_negocio": "Reduz drasticamente a superfície de ataque para workloads sensíveis, simplificando processos de auditoria de segurança e auditorias regulatórias."
+        },
+        {
+          "topico": "Conectividade Controlada por Gateways Especializados",
+          "descricao": "Utilização de gateways dedicados conforme a necessidade: Internet Gateway para comunicação pública bidirecional, NAT Gateway para conexões de saída iniciadas pela sub-rede privada, Service Gateway para acesso privado ao Object Storage e DRG/LPG para conexões privadas com data centers ou outras VCNs.",
+          "impacto_negocio": "Garante acesso seguro a serviços nativos e comunicação externa sem expor instâncias privadas a tráfego de entrada não solicitado, além de evitar custos de saída de dados via internet no uso do Service Gateway."
+        },
+        {
+          "topico": "Controle de Tráfego por Security Lists e NSGs",
+          "descricao": "Combinação de regras de entrada e saída por Security Lists (no nível da sub-rede, com ou sem estado) e Network Security Groups (no nível das VNICs). A avaliação conjunta autoriza o tráfego se ao menos uma regra o permitir.",
+          "impacto_negocio": "Permite granularidade de segurança suficiente para que servidores de aplicação e bancos de dados compartilhem a mesma sub-rede mantendo conjuntos de regras distintos e auditáveis."
+        },
+        {
+          "topico": "Resolução de Nomes Internos via DNS Privado",
+          "descricao": "Integração de um resolvedor DNS privado nativo da VCN que gera nomes de host internos previsíveis a partir de rótulos de DNS definidos na VCN e sub-redes.",
+          "impacto_negocio": "Garante resiliência e facilidade de manutenção no acoplamento de serviços, eliminando a dependência de endereçamento IP fixo nas conexões entre microserviços."
+        }
+      ]
+    },
+    "avaliacao_qualidade": {
+      "ancoragem_fonte_score": 0.81,
+      "clareza_pedagogica": "Alta",
+      "observacoes": "O material está totalmente ancorado no contexto fornecido, sem alucinações técnicas. A contextualização para o público-alvo (Líder Técnico / Arquiteto) e os impactos de negócio derivados são precisos e adequados. Verificação léxica: cobertura léxica de 45%."
+    },
+    "armazenamento_oci": {
+      "bucket": "novamente-conteudos-educativos",
+      "objeto_id": "conteudos/oci-vcn-arquitetura-de-redes-lider-tecnico-arquit-resumo-executivo-0513f4.json",
+      "status_upload": "local",
+      "backend": "local",
+      "uri": "file:///C:/Users/inasio/OneDrive/%C3%81rea%20de%20Trabalho/Projeto_Nova_Mente/storage_local/conteudos/oci-vcn-arquitetura-de-redes-lider-tecnico-arquit-resumo-executivo-0513f4.json"
+    }
+  },
+  "diagnostico_pipeline": {
+    "trace": [
+      "orquestrador: LangGraph (grafo de decisão)",
+      "roteador: plano gerado (langchain:gemini-3.5-flash)",
+      "pesquisador_rag: 7 chunks indexados em chromadb · embeddings gemini:models/gemini-embedding-001 · 5 trechos recuperados (sim. média 0.7548)",
+      "redator_pedagogico: material gerado (primeira versão) com 4 itens",
+      "critico_revisor: score final 0.78 (LLM 1.0 · léxico 0.3826) · clareza Alta",
+      "roteador: devolvendo para revisão (rodada 1)",
+      "redator_pedagogico: material gerado (revisão 1) com 5 itens",
+      "critico_revisor: score final 0.81 (LLM 1.0 · léxico 0.4456) · clareza Alta",
+      "storage: documento original -> local (originais/oci-vcn-arquitetura-de-redes-md-7f043b.md)"
+    ],
+    "backend_llm": "langchain:gemini-3.5-flash",
+    "backend_embeddings": "gemini:models/gemini-embedding-001",
+    "backend_vetorial": "chromadb",
+    "backend_storage": "local",
+    "chunks_indexados": 7,
+    "trechos_recuperados": 5,
+    "similaridade_media": 0.7548,
+    "rodadas_de_revisao": 1,
+    "estatisticas_chunks": {
+      "total_chunks": 7,
+      "media_caracteres": 992.4,
+      "min": 695,
+      "max": 1302
+    },
+    "avisos": []
+  }
+}

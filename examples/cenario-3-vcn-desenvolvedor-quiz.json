@@ -1,0 +1,133 @@
+{
+  "cenario": {
+    "id": 3,
+    "descricao": "MESMO documento (VCN) para desenvolvedor, em quiz avaliativo.",
+    "documento_fonte": "oci_vcn_arquitetura_de_redes.md",
+    "formato_ingestao": "markdown",
+    "duracao_segundos": 38.3
+  },
+  "requisicao": {
+    "documento_titulo": "oci vcn arquitetura de redes",
+    "documento_conteudo": "# Arquitetura de Redes na Oracle Cloud Infrastructure: a Virtual Cloud Network (VCN)\n\n## O que é uma VCN\n\nA Virtual Cloud Network (VCN) é uma rede privada e personalizável configurada na\nOracle Cloud Infrastructure. Semelhante a uma rede de data center tradicional, a\nVCN oferece controle total sobre o ambiente de rede, incluindo sub-redes públicas\ne privadas, tabelas de roteamento, gateways e listas de segurança.\n\nUma VCN existe dentro de uma única região da OCI, mas abrange todos os domínios\nde disponibilidade dessa região. Ao criar a VCN, define-se um bloco de endereços\nno formato CIDR (Classless Inter-Domain Routing), que delimita a faixa de\nendereços IP privados disponíveis para todos os recursos que serão conectados a\nela. Esse bloco não pode se sobrepor ao de outras redes com as quais a VCN\nprecise se comunicar, sob pena de conflito de roteamento.\n\n## Sub-redes\n\nA VCN é subdividida em sub-redes. Cada sub-rede recebe um subconjunto do bloco\nCIDR da VCN e funciona como uma unidade de organização e de controle de acesso.\n\nExistem dois tipos de sub-rede:\n\n- Sub-rede pública: os recursos nela podem receber endereços IP públicos e,\n portanto, ser alcançados diretamente da internet, desde que o roteamento e as\n regras de segurança permitam.\n- Sub-rede privada: os recursos não recebem endereço IP público. Essa é a\n escolha padrão para bancos de dados, filas e serviços internos que nunca devem\n ser expostos diretamente.\n\nUma sub-rede pode ser regional (abrangendo toda a região) ou específica de um\ndomínio de disponibilidade. Sub-redes regionais são a recomendação atual, porque\nsimplificam o desenho de alta disponibilidade.\n\n## Gateways\n\nOs gateways conectam a VCN ao mundo externo. Cada tipo serve a um propósito\ndistinto:\n\n- Internet Gateway: permite tráfego bidirecional entre a sub-rede pública e\n a internet. Só faz sentido em sub-redes públicas.\n- NAT Gateway: permite que recursos de uma sub-rede privada iniciem conexões\n de saída para a internet, por exemplo para baixar atualizações de pacotes, sem\n que esses recursos se tornem alcançáveis de fora. O tráfego de entrada não\n solicitado continua bloqueado.\n- Service Gateway: dá acesso privado a serviços da própria Oracle, como\n Object Storage, sem que o tráfego trafegue pela internet pública. Além do ganho\n de segurança, evita custo de saída de dados.\n- Dynamic Routing Gateway (DRG): conecta a VCN a redes externas privadas,\n como o data center da empresa via VPN IPSec ou FastConnect, e também a outras\n VCNs.\n- Local Peering Gateway: conecta duas VCNs da mesma região diretamente.\n\n## Tabelas de roteamento\n\nCada sub-rede está associada a uma tabela de roteamento, que contém regras\nindicando para qual gateway enviar o tráfego destinado a um determinado bloco\nCIDR. O roteamento dentro da própria VCN é implícito: recursos de sub-redes\ndiferentes da mesma VCN se comunicam sem necessidade de regra explícita.\n\nUma regra de rota típica de uma sub-rede privada envia todo o tráfego destinado a\n0.0.0.0/0 para o NAT Gateway. Em uma sub-rede pública, a mesma rota aponta para o\nInternet Gateway.\n\n## Security Lists e Network Security Groups\n\nO controle de tráfego na OCI acontece em duas camadas complementares.\n\nAs Security Lists são listas de regras associadas à sub-rede. Toda instância\ndentro daquela sub-rede herda as mesmas regras. As regras se dividem em:\n\n- Regras de entrada (ingress): definem qual tráfego pode chegar aos recursos.\n- Regras de saída (egress): definem qual tráfego pode sair dos recursos.\n\nCada regra especifica protocolo, porta e origem ou destino. As regras podem ser\ncom estado (stateful) ou sem estado (stateless). Em uma regra com estado, a OCI\nrastreia a conexão e libera automaticamente o tráfego de resposta, o que dispensa\ncriar uma regra inversa. Em uma regra sem estado, é necessário declarar\nexplicitamente as duas direções.\n\nOs Network Security Groups (NSG) oferecem controle mais granular: em vez de\nvaler para a sub-rede inteira, as regras se aplicam a um conjunto nomeado de\nplacas de rede virtuais. Isso permite, por exemplo, que servidores de aplicação e\nservidores de banco de dados convivam na mesma sub-rede com regras diferentes. Um\nNSG pode referenciar outro NSG como origem, o que elimina a necessidade de fixar\nendereços IP nas regras.\n\nQuando uma Security List e um NSG se aplicam ao mesmo recurso, a união das regras\né avaliada: basta que uma delas permita o tráfego para que ele seja aceito.\n\n## Resolução de nomes\n\nA VCN inclui um resolvedor DNS privado. Ao criar a VCN e as sub-redes, é possível\ndefinir rótulos de DNS que compõem nomes de host internos previsíveis, permitindo\nque os recursos se encontrem por nome em vez de por endereço IP.\n\n## Padrão de arquitetura de referência\n\nO desenho mais comum para uma aplicação web na OCI usa duas camadas de sub-rede:\n\n1. Uma sub-rede pública regional contendo o balanceador de carga, protegida por\n regras de entrada que liberam apenas as portas 80 e 443.\n2. Uma sub-rede privada regional contendo as instâncias de aplicação e o banco de\n dados, com rota de saída pelo NAT Gateway e acesso ao Object Storage pelo\n Service Gateway.\n\nNesse desenho, nenhuma instância de aplicação tem endereço IP público. O único\nponto de entrada é o balanceador de carga, o que reduz drasticamente a superfície\nde exposição e simplifica a auditoria de segurança.\n\n## Boas práticas\n\n- Planeje o bloco CIDR antes de criar a VCN. Alterar o endereçamento depois, com\n recursos em produção, é trabalhoso e arriscado.\n- Mantenha bancos de dados sempre em sub-rede privada.\n- Prefira Network Security Groups a Security Lists quando precisar de regras\n diferentes para recursos que compartilham a mesma sub-rede.\n- Use o Service Gateway para acessar serviços da Oracle, em vez de rotear esse\n tráfego pela internet.\n- Aplique o princípio do menor privilégio nas regras de entrada: libere apenas as\n portas e origens estritamente necessárias.\n- Documente cada regra de segurança. Uma regra sem justificativa registrada tende\n a permanecer para sempre, mesmo depois de perder a finalidade.",
+    "perfil_destinatario": "Desenvolvedor Júnior / Pleno",
+    "formato_saida": "Quiz",
+    "nicho_setor": "Geral",
+    "nivel_detalhe": "Intermediario"
+  },
+  "resposta": {
+    "status": "sucesso",
+    "metadados": {
+      "perfil_aplicado": "Desenvolvedor Júnior / Pleno",
+      "formato_gerado": "Quiz",
+      "tempo_estimado_estudo_minutos": 8,
+      "conceitos_chave": [
+        "Virtual Cloud Network (VCN)",
+        "NAT Gateway vs Service Gateway",
+        "Security Lists vs NSGs",
+        "Roteamento Implícito em VCN"
+      ],
+      "pre_requisitos": [
+        "Conceitos básicos de redes (endereçamento IP, portas e CIDR)",
+        "Noções gerais de arquitetura de aplicações web"
+      ]
+    },
+    "conteudo_adaptado": {
+      "titulo": "Quiz Técnico: Arquitetura de Redes e VCN na OCI",
+      "introducao_contextualizada": "Avalie seus conhecimentos práticos sobre o desenho de Virtual Cloud Networks (VCN) na Oracle Cloud Infrastructure. Este quiz valida decisões de arquitetura envolvendo segregação de sub-redes, escolha de gateways de conectividade e políticas de segurança com Security Lists e NSGs.",
+      "itens": [
+        {
+          "pergunta": "Em uma arquitetura de sub-rede privada na OCI, qual componente deve ser configurado para permitir que os servidores baixem atualizações na internet sem expor as instâncias a conexões de entrada não solicitadas?",
+          "opcoes": [
+            "Internet Gateway",
+            "NAT Gateway",
+            "Service Gateway",
+            "Local Peering Gateway"
+          ],
+          "indice_resposta_correta": 1,
+          "justificativa": "O NAT Gateway permite que recursos em sub-redes privadas iniciem conexões de saída para a internet (como para atualização de pacotes) mantendo o tráfego de entrada não solicitado bloqueado. O Internet Gateway é bidirecional para sub-redes públicas, o Service Gateway é restrito a serviços Oracle e o Local Peering Gateway conecta VCNs na mesma região."
+        },
+        {
+          "pergunta": "Qual é a principal diferença prática de escopo e aplicação entre Security Lists e Network Security Groups (NSGs)?",
+          "opcoes": [
+            "Security Lists aplicam-se às placas de rede virtuais (VNICs), enquanto NSGs valem para toda a sub-rede.",
+            "Security Lists gerenciam apenas tráfego de saída, enquanto NSGs controlam exclusivamente o tráfego de entrada.",
+            "Security Lists aplicam-se no nível de sub-rede inteira, enquanto NSGs aplicam-se a conjuntos de placas de rede virtuais (VNICs), permitindo regras distintas na mesma sub-rede.",
+            "NSGs exigem obrigatoriamente a fixação de endereços IP de origem, enquanto Security Lists permitem referenciar outros grupos."
+          ],
+          "indice_resposta_correta": 2,
+          "justificativa": "As Security Lists aplicam-se a toda a sub-rede. Já os NSGs oferecem controle granular associando regras a conjuntos de placas de rede virtuais (VNICs), permitindo inclusive que um NSG referencie outro como origem sem fixar endereços IP."
+        },
+        {
+          "pergunta": "Como funciona o roteamento de tráfego entre duas sub-redes distintas que pertencem à mesma VCN na OCI?",
+          "opcoes": [
+            "O tráfego exige a configuração explícita de uma rota apontando para o Internet Gateway.",
+            "É necessário criar um Local Peering Gateway para interconectar as sub-redes.",
+            "O roteamento é implícito, ou seja, recursos de sub-redes diferentes da mesma VCN se comunicam sem necessidade de regra explícita.",
+            "Exige a criação de uma regra sem estado (stateless) na tabela de roteamento da VCN."
+          ],
+          "indice_resposta_correta": 2,
+          "justificativa": "Na OCI, o roteamento dentro da própria VCN é implícito. Recursos localizados em sub-redes diferentes da mesma VCN se comunicam nativamente sem a necessidade de definir regras explícitas na tabela de roteamento."
+        },
+        {
+          "pergunta": "Qual é a vantagem de utilizar o Service Gateway para acessar serviços como o Object Storage a partir de uma VCN?",
+          "opcoes": [
+            "Permite que clientes externos acessem o Object Storage através da sub-rede privada.",
+            "Dá acesso privado a serviços da Oracle sem que o tráfego passe pela internet pública, garantindo segurança e evitando custo de saída de dados.",
+            "Substitui a necessidade de utilizar tabelas de roteamento na sub-rede privada.",
+            "Conecta diretamente a VCN ao data center corporativo do cliente via rede privada."
+          ],
+          "indice_resposta_correta": 1,
+          "justificativa": "O Service Gateway provê acesso privado a serviços da própria Oracle (como o Object Storage) sem trafegar pela internet pública, o que aumenta a segurança e elimina custos de saída de dados."
+        },
+        {
+          "pergunta": "Para estabelecer conectividade privada entre uma VCN na OCI e o data center corporativo de uma empresa via VPN IPSec ou FastConnect, qual gateway deve ser utilizado?",
+          "opcoes": [
+            "Dynamic Routing Gateway (DRG)",
+            "Local Peering Gateway (LPG)",
+            "Internet Gateway",
+            "NAT Gateway"
+          ],
+          "indice_resposta_correta": 0,
+          "justificativa": "O Dynamic Routing Gateway (DRG) é o componente responsável por conectar a VCN a redes externas privadas, como o data center da empresa (via VPN IPSec ou FastConnect), além de conectar a outras VCNs."
+        }
+      ]
+    },
+    "avaliacao_qualidade": {
+      "ancoragem_fonte_score": 0.82,
+      "clareza_pedagogica": "Alta",
+      "observacoes": "O quiz está inteiramente baseado nas informações do contexto fornecido, sem qualquer alucinação técnica. As perguntas testam conceitos práticos de redes na OCI com excelente clareza. Verificação léxica: cobertura léxica de 53%; 1 identificador(es) sem respaldo (aplicam-se)."
+    },
+    "armazenamento_oci": {
+      "bucket": "novamente-conteudos-educativos",
+      "objeto_id": "conteudos/oci-vcn-arquitetura-de-redes-desenvolvedor-junior-quiz-1ed4ee.json",
+      "status_upload": "local",
+      "backend": "local",
+      "uri": "file:///C:/Users/inasio/OneDrive/%C3%81rea%20de%20Trabalho/Projeto_Nova_Mente/storage_local/conteudos/oci-vcn-arquitetura-de-redes-desenvolvedor-junior-quiz-1ed4ee.json"
+    }
+  },
+  "diagnostico_pipeline": {
+    "trace": [
+      "orquestrador: LangGraph (grafo de decisão)",
+      "roteador: plano gerado (langchain:gemini-3.5-flash)",
+      "pesquisador_rag: 7 chunks indexados em chromadb · embeddings gemini:models/gemini-embedding-001 · 5 trechos recuperados (sim. média 0.797)",
+      "redator_pedagogico: material gerado (primeira versão) com 5 itens",
+      "critico_revisor: score final 0.82 (LLM 1.0 · léxico 0.4933) · clareza Alta",
+      "storage: documento original -> local (originais/oci-vcn-arquitetura-de-redes-md-a1ca53.md)"
+    ],
+    "backend_llm": "langchain:gemini-3.5-flash",
+    "backend_embeddings": "gemini:models/gemini-embedding-001",
+    "backend_vetorial": "chromadb",
+    "backend_storage": "local",
+    "chunks_indexados": 7,
+    "trechos_recuperados": 5,
+    "similaridade_media": 0.797,
+    "rodadas_de_revisao": 0,
+    "estatisticas_chunks": {
+      "total_chunks": 7,
+      "media_caracteres": 992.4,
+      "min": 695,
+      "max": 1302
+    },
+    "avisos": []
+  }
+}

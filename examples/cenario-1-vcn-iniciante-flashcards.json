@@ -1,0 +1,113 @@
+{
+  "cenario": {
+    "id": 1,
+    "descricao": "Mesmo documento (VCN) para público iniciante, em flashcards.",
+    "documento_fonte": "oci_vcn_arquitetura_de_redes.md",
+    "formato_ingestao": "markdown",
+    "duracao_segundos": 45.3
+  },
+  "requisicao": {
+    "documento_titulo": "oci vcn arquitetura de redes",
+    "documento_conteudo": "# Arquitetura de Redes na Oracle Cloud Infrastructure: a Virtual Cloud Network (VCN)\n\n## O que é uma VCN\n\nA Virtual Cloud Network (VCN) é uma rede privada e personalizável configurada na\nOracle Cloud Infrastructure. Semelhante a uma rede de data center tradicional, a\nVCN oferece controle total sobre o ambiente de rede, incluindo sub-redes públicas\ne privadas, tabelas de roteamento, gateways e listas de segurança.\n\nUma VCN existe dentro de uma única região da OCI, mas abrange todos os domínios\nde disponibilidade dessa região. Ao criar a VCN, define-se um bloco de endereços\nno formato CIDR (Classless Inter-Domain Routing), que delimita a faixa de\nendereços IP privados disponíveis para todos os recursos que serão conectados a\nela. Esse bloco não pode se sobrepor ao de outras redes com as quais a VCN\nprecise se comunicar, sob pena de conflito de roteamento.\n\n## Sub-redes\n\nA VCN é subdividida em sub-redes. Cada sub-rede recebe um subconjunto do bloco\nCIDR da VCN e funciona como uma unidade de organização e de controle de acesso.\n\nExistem dois tipos de sub-rede:\n\n- Sub-rede pública: os recursos nela podem receber endereços IP públicos e,\n portanto, ser alcançados diretamente da internet, desde que o roteamento e as\n regras de segurança permitam.\n- Sub-rede privada: os recursos não recebem endereço IP público. Essa é a\n escolha padrão para bancos de dados, filas e serviços internos que nunca devem\n ser expostos diretamente.\n\nUma sub-rede pode ser regional (abrangendo toda a região) ou específica de um\ndomínio de disponibilidade. Sub-redes regionais são a recomendação atual, porque\nsimplificam o desenho de alta disponibilidade.\n\n## Gateways\n\nOs gateways conectam a VCN ao mundo externo. Cada tipo serve a um propósito\ndistinto:\n\n- Internet Gateway: permite tráfego bidirecional entre a sub-rede pública e\n a internet. Só faz sentido em sub-redes públicas.\n- NAT Gateway: permite que recursos de uma sub-rede privada iniciem conexões\n de saída para a internet, por exemplo para baixar atualizações de pacotes, sem\n que esses recursos se tornem alcançáveis de fora. O tráfego de entrada não\n solicitado continua bloqueado.\n- Service Gateway: dá acesso privado a serviços da própria Oracle, como\n Object Storage, sem que o tráfego trafegue pela internet pública. Além do ganho\n de segurança, evita custo de saída de dados.\n- Dynamic Routing Gateway (DRG): conecta a VCN a redes externas privadas,\n como o data center da empresa via VPN IPSec ou FastConnect, e também a outras\n VCNs.\n- Local Peering Gateway: conecta duas VCNs da mesma região diretamente.\n\n## Tabelas de roteamento\n\nCada sub-rede está associada a uma tabela de roteamento, que contém regras\nindicando para qual gateway enviar o tráfego destinado a um determinado bloco\nCIDR. O roteamento dentro da própria VCN é implícito: recursos de sub-redes\ndiferentes da mesma VCN se comunicam sem necessidade de regra explícita.\n\nUma regra de rota típica de uma sub-rede privada envia todo o tráfego destinado a\n0.0.0.0/0 para o NAT Gateway. Em uma sub-rede pública, a mesma rota aponta para o\nInternet Gateway.\n\n## Security Lists e Network Security Groups\n\nO controle de tráfego na OCI acontece em duas camadas complementares.\n\nAs Security Lists são listas de regras associadas à sub-rede. Toda instância\ndentro daquela sub-rede herda as mesmas regras. As regras se dividem em:\n\n- Regras de entrada (ingress): definem qual tráfego pode chegar aos recursos.\n- Regras de saída (egress): definem qual tráfego pode sair dos recursos.\n\nCada regra especifica protocolo, porta e origem ou destino. As regras podem ser\ncom estado (stateful) ou sem estado (stateless). Em uma regra com estado, a OCI\nrastreia a conexão e libera automaticamente o tráfego de resposta, o que dispensa\ncriar uma regra inversa. Em uma regra sem estado, é necessário declarar\nexplicitamente as duas direções.\n\nOs Network Security Groups (NSG) oferecem controle mais granular: em vez de\nvaler para a sub-rede inteira, as regras se aplicam a um conjunto nomeado de\nplacas de rede virtuais. Isso permite, por exemplo, que servidores de aplicação e\nservidores de banco de dados convivam na mesma sub-rede com regras diferentes. Um\nNSG pode referenciar outro NSG como origem, o que elimina a necessidade de fixar\nendereços IP nas regras.\n\nQuando uma Security List e um NSG se aplicam ao mesmo recurso, a união das regras\né avaliada: basta que uma delas permita o tráfego para que ele seja aceito.\n\n## Resolução de nomes\n\nA VCN inclui um resolvedor DNS privado. Ao criar a VCN e as sub-redes, é possível\ndefinir rótulos de DNS que compõem nomes de host internos previsíveis, permitindo\nque os recursos se encontrem por nome em vez de por endereço IP.\n\n## Padrão de arquitetura de referência\n\nO desenho mais comum para uma aplicação web na OCI usa duas camadas de sub-rede:\n\n1. Uma sub-rede pública regional contendo o balanceador de carga, protegida por\n regras de entrada que liberam apenas as portas 80 e 443.\n2. Uma sub-rede privada regional contendo as instâncias de aplicação e o banco de\n dados, com rota de saída pelo NAT Gateway e acesso ao Object Storage pelo\n Service Gateway.\n\nNesse desenho, nenhuma instância de aplicação tem endereço IP público. O único\nponto de entrada é o balanceador de carga, o que reduz drasticamente a superfície\nde exposição e simplifica a auditoria de segurança.\n\n## Boas práticas\n\n- Planeje o bloco CIDR antes de criar a VCN. Alterar o endereçamento depois, com\n recursos em produção, é trabalhoso e arriscado.\n- Mantenha bancos de dados sempre em sub-rede privada.\n- Prefira Network Security Groups a Security Lists quando precisar de regras\n diferentes para recursos que compartilham a mesma sub-rede.\n- Use o Service Gateway para acessar serviços da Oracle, em vez de rotear esse\n tráfego pela internet.\n- Aplique o princípio do menor privilégio nas regras de entrada: libere apenas as\n portas e origens estritamente necessárias.\n- Documente cada regra de segurança. Uma regra sem justificativa registrada tende\n a permanecer para sempre, mesmo depois de perder a finalidade.",
+    "perfil_destinatario": "Iniciante",
+    "formato_saida": "Flashcards",
+    "nicho_setor": "Geral",
+    "nivel_detalhe": "Didatico"
+  },
+  "resposta": {
+    "status": "sucesso",
+    "metadados": {
+      "perfil_aplicado": "Iniciante",
+      "formato_gerado": "Flashcards",
+      "tempo_estimado_estudo_minutos": 8,
+      "conceitos_chave": [
+        "Virtual Cloud Network (VCN)",
+        "Sub-redes Públicas e Privadas",
+        "Gateways de Rede",
+        "Security Lists e NSGs"
+      ],
+      "pre_requisitos": [
+        "Noções básicas de computação em nuvem",
+        "Conceito básico de endereço IP"
+      ]
+    },
+    "conteudo_adaptado": {
+      "titulo": "Flashcards Didáticos: Arquitetura de Redes (VCN) na Oracle Cloud",
+      "introducao_contextualizada": "Seja bem-vindo ao estudo da VCN, a rede privada virtual da Oracle Cloud Infrastructure. Estes flashcards foram criados de forma simples e direta para ajudar você a memorizar os principais componentes de rede sem complicações.",
+      "itens": [
+        {
+          "frente": "O que é uma Virtual Cloud Network (VCN) na Oracle Cloud?",
+          "verso": "É uma rede privada e personalizável configurada em uma região da Oracle Cloud. Ela funciona como a rede de um data center tradicional, oferecendo controle total sobre o tráfego, endereços de IP e regras de acesso.",
+          "dica_didatica": "Pense na VCN como um terreno cercado e seguro onde você coloca os seus servidores na nuvem."
+        },
+        {
+          "frente": "Qual a diferença entre uma Sub-rede Pública e uma Sub-rede Privada?",
+          "verso": "Na sub-rede pública, os recursos podem ter IP público e ser acessados direto da internet. Na sub-rede privada, os recursos não recebem IP público e ficam isolados da internet (ideal para bancos de dados).",
+          "dica_didatica": "A sub-rede pública é a recepção aberta do prédio; a sub-rede privada é o cofre trancado no fundo."
+        },
+        {
+          "frente": "Para que serve o Internet Gateway?",
+          "verso": "É o componente de rede que permite a comunicação nos dois sentidos (entrada e saída) entre uma sub-rede pública e a internet.",
+          "dica_didatica": "Ele é a porta de entrada e saída principal que liga sua rede aberta à rua (internet)."
+        },
+        {
+          "frente": "Qual é a função do NAT Gateway em uma sub-rede privada?",
+          "verso": "Ele permite que os computadores da sub-rede privada iniciem conexões para fora (como baixar atualizações na internet), sem permitir que pessoas de fora iniciem conexões para dentro dela.",
+          "dica_didatica": "Funciona como uma porta de saída de emergência: quem está dentro sai, mas ninguém da rua consegue entrar por ela."
+        },
+        {
+          "frente": "O que faz o Service Gateway?",
+          "verso": "Dá acesso privado e seguro a serviços da própria Oracle (como o Object Storage) sem que o tráfego precise passar pela internet pública, evitando custos extras de saída de dados.",
+          "dica_didatica": "É como um corredor interno privado que liga sua sala direto ao depósito da empresa sem precisar sair no meio da rua."
+        },
+        {
+          "frente": "Qual a diferença entre uma regra de segurança com estado (stateful) e sem estado (stateless)?",
+          "verso": "Nas regras com estado (stateful), o sistema lembra da conexão e libera a resposta automaticamente. Nas regras sem estado (stateless), você precisa criar manualmente uma regra para o tráfego ir e outra para ele voltar.",
+          "dica_didatica": "Regra com estado é como um ticket de retorno automático; sem estado exige autorização para ir e nova autorização para voltar."
+        },
+        {
+          "frente": "O que é um Network Security Group (NSG) e como ele se difere da Security List?",
+          "verso": "A Security List vale para a sub-rede inteira. O NSG permite aplicar regras de segurança diretamente a placas de rede específicas, permitindo que servidores na mesma sub-rede tenham regras diferentes.",
+          "dica_didatica": "A Security List é o crachá para entrar no andar (sub-rede); o NSG é a chave individual para abrir uma mesa específica."
+        }
+      ]
+    },
+    "avaliacao_qualidade": {
+      "ancoragem_fonte_score": 0.82,
+      "clareza_pedagogica": "Alta",
+      "observacoes": "O material é totalmente ancorado no contexto de origem e utiliza ótimas analogias pedagógicas para o perfil iniciante sem introduzir fatos inventados. Verificação léxica: cobertura léxica de 52%; 1 identificador(es) sem respaldo (bem-vindo)."
+    },
+    "armazenamento_oci": {
+      "bucket": "novamente-conteudos-educativos",
+      "objeto_id": "conteudos/oci-vcn-arquitetura-de-redes-iniciante-flashcards-173dbf.json",
+      "status_upload": "local",
+      "backend": "local",
+      "uri": "file:///C:/Users/inasio/OneDrive/%C3%81rea%20de%20Trabalho/Projeto_Nova_Mente/storage_local/conteudos/oci-vcn-arquitetura-de-redes-iniciante-flashcards-173dbf.json"
+    }
+  },
+  "diagnostico_pipeline": {
+    "trace": [
+      "orquestrador: LangGraph (grafo de decisão)",
+      "roteador: plano gerado (langchain:gemini-3.5-flash)",
+      "pesquisador_rag: 7 chunks indexados em chromadb · embeddings gemini:models/gemini-embedding-001 · 5 trechos recuperados (sim. média 0.7996)",
+      "redator_pedagogico: material gerado (primeira versão) com 7 itens",
+      "critico_revisor: score final 0.82 (LLM 1.0 · léxico 0.4841) · clareza Alta",
+      "storage: documento original -> local (originais/oci-vcn-arquitetura-de-redes-md-9c345c.md)"
+    ],
+    "backend_llm": "langchain:gemini-3.5-flash",
+    "backend_embeddings": "gemini:models/gemini-embedding-001",
+    "backend_vetorial": "chromadb",
+    "backend_storage": "local",
+    "chunks_indexados": 7,
+    "trechos_recuperados": 5,
+    "similaridade_media": 0.7996,
+    "rodadas_de_revisao": 0,
+    "estatisticas_chunks": {
+      "total_chunks": 7,
+      "media_caracteres": 992.4,
+      "min": 695,
+      "max": 1302
+    },
+    "avisos": []
+  }
+}
