@@ -32,8 +32,8 @@ fidelidade técnica ao documento de origem.
    → Crítico/Revisor) em um grafo de decisão com rodada de revisão.
 4. **Audita a fidelidade** em duas camadas independentes, incluindo detecção
    determinística de números e identificadores inventados.
-5. **Entrega** JSON estruturado, interface interativa e exportação em Markdown,
-   PDF didático e CSV compatível com Anki.
+5. **Entrega** JSON estruturado, interface interativa e exportação em
+   apresentação PowerPoint, PDF didático, Markdown e CSV compatível com Anki.
 6. **Persiste** o documento original e o pacote gerado no **OCI Object Storage**
    (camada Always Free).
 
@@ -61,7 +61,7 @@ flowchart LR
     F -->|aprovado| G["Validação Pydantic"]
     G --> H["JSON estruturado"]
     H --> I["Streamlit · FastAPI"]
-    H --> J["Markdown · PDF · Anki"]
+    H --> J["PPTX · PDF · Markdown · Anki"]
     H --> K["OCI Object Storage"]
 ```
 
@@ -97,7 +97,7 @@ limitam a 0.59, independentemente do que o LLM afirme.
 | Tipagem / validação | Pydantic v2 + pydantic-settings |
 | API | FastAPI + Uvicorn |
 | Interface | Streamlit |
-| Exportação | reportlab (PDF), csv (Anki) |
+| Exportação | python-pptx (apresentação), reportlab (PDF), csv (Anki) |
 | Nuvem | OCI Object Storage — camada Always Free |
 | Deploy | Railway (Docker) · OCI Compute Always Free |
 
@@ -180,6 +180,7 @@ Documentação interativa em `http://localhost:8000/docs`.
 | `GET` | `/opcoes` | Valores aceitos em cada eixo de parametrização |
 | `POST` | `/adaptar` | **Endpoint principal** — adaptação de conteúdo |
 | `POST` | `/adaptar/upload` | Adaptação a partir de upload de arquivo |
+| `POST` | `/exportar/pptx` | Converte a resposta em apresentação PowerPoint |
 | `POST` | `/exportar/markdown` | Converte a resposta em Markdown |
 | `POST` | `/exportar/pdf` | Converte a resposta em PDF didático |
 | `POST` | `/exportar/csv-anki` | Converte a resposta em CSV para Anki |
@@ -405,6 +406,7 @@ app/
 ├── agents/                 llm · prompts · fidelity · graph
 ├── storage/                base · local · oci_storage · factory
 ├── export/exporters.py     Markdown · PDF · CSV Anki
+├── export/slides.py        Apresentação .pptx (layout institucional)
 ├── pipeline.py             Orquestração de ponta a ponta
 └── api/main.py             FastAPI
 
@@ -436,8 +438,8 @@ tests/                      Suíte de testes
   Pedagógico e Crítico/Revisor, com aresta condicional de revisão.
 - ✅ **Quiz com avaliação em tempo real** — aba dedicada no Streamlit, com
   feedback explicativo imediato e placar de desempenho.
-- ✅ **Exportação multiformato** — Markdown, PDF didático formatado e CSV
-  compatível com Anki.
+- ✅ **Exportação multiformato** — apresentação PowerPoint pronta para aula,
+  PDF didático formatado, Markdown e CSV compatível com Anki.
 - ⏳ **Deploy completo em nuvem OCI** — imagem Docker e instruções prontas;
   pendente de execução na instância Compute Always Free.
 

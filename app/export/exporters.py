@@ -6,6 +6,7 @@ import csv
 import io
 from typing import Any
 
+from app.export.slides import para_pptx  # noqa: F401  (reexport público)
 from app.schemas.content import RespostaAdaptacao
 
 

@@ -38,3 +38,6 @@ desktop.ini
 
 # O briefing original fica versionado apenas em docs/briefing/ (evita 4 MB duplicados)
 /Nova_Mente.pdf
+
+# Config local do Claude Code (mantemos apenas o launch.json)
+.claude/settings.local.json

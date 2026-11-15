@@ -198,10 +198,19 @@ qualquer sistema externo.
 O documento original e o pacote gerado são persistidos no Object Storage da
 Oracle Cloud, na camada Always Free.
 
-E o material pode ser exportado em Markdown, em PDF didático formatado, ou em
-CSV para importar direto no Anki."
+E o material pode ser exportado como uma apresentação de aula pronta em
+PowerPoint, em PDF didático, em Markdown, ou em CSV para importar direto no
+Anki."
 
-> **Ação:** clique em "PDF didático" para mostrar o download acontecendo.
+> **Ação:** clique em "Baixar apresentação (.pptx)" e abra o arquivo. Mostre a
+> capa, um slide de conteúdo e o slide de procedência com o score de ancoragem.
+
+**Fala:**
+
+"Repara que não é um despejo de texto em slides: tem capa, ficha do material,
+um slide por conceito, e no fim um slide de procedência com o score de
+ancoragem na fonte. É material que o professor leva direto para a sala."
+
 
 ---
 

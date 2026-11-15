@@ -9,7 +9,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 
 from app.core.config import get_settings
-from app.export.exporters import para_csv_anki, para_markdown, para_pdf
+from app.export.exporters import (
+    para_csv_anki,
+    para_markdown,
+    para_pdf,
+    para_pptx,
+)
 from app.ingestion.loader import ErroIngestao, carregar_bytes
 from app.pipeline import ErroPipeline, adaptar_conteudo
 from app.schemas.content import (
@@ -217,6 +222,23 @@ def exportar_csv(resposta: RespostaAdaptacao) -> Response:
         content=para_csv_anki(resposta),
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="novamente-anki.csv"'},
+    )
+
+
+@app.post("/exportar/pptx", tags=["exportacao"])
+def exportar_pptx(resposta: RespostaAdaptacao) -> Response:
+    """Apresentação de aula em PowerPoint, um slide por item de conteúdo."""
+    try:
+        conteudo = para_pptx(resposta)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return Response(
+        content=conteudo,
+        media_type=(
+            "application/vnd.openxmlformats-officedocument."
+            "presentationml.presentation"
+        ),
+        headers={"Content-Disposition": 'attachment; filename="novamente.pptx"'},
     )
 
 

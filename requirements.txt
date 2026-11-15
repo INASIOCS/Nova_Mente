@@ -31,3 +31,6 @@ oci
 
 # --- Utilitários ---
 requests
+
+# --- Apresentacao ---
+python-pptx

@@ -22,7 +22,12 @@ if _conflito is not None and not hasattr(_conflito, "__path__"):
     del sys.modules["app"]
 
 from app.core.config import get_settings  # noqa: E402
-from app.export.exporters import para_csv_anki, para_markdown, para_pdf  # noqa: E402
+from app.export.exporters import (  # noqa: E402
+    para_csv_anki,
+    para_markdown,
+    para_pdf,
+    para_pptx,
+)
 from app.ingestion.loader import (  # noqa: E402
     ErroIngestao,
     carregar_arquivo,
@@ -39,30 +44,132 @@ from app.schemas.content import (  # noqa: E402
 )
 
 st.set_page_config(
-    page_title="NovaMente — Adaptação de Conteúdo Educacional",
-    page_icon="🧠",
+    page_title="NovaMente — Núcleo de Conteúdo Educacional",
+    page_icon="🎓",
     layout="wide",
 )
 
 CSS = """
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Inter:wght@400;500;600&display=swap');
+
+:root {
+    --nm-tinta: #16254C;
+    --nm-tinta-clara: #2E4A86;
+    --nm-ouro: #C08A2E;
+    --nm-grafite: #1F2733;
+    --nm-cinza: #5D6B7E;
+    --nm-palha: #F2F5FA;
+    --nm-borda: #DCE3EE;
+}
+
+html, body, [data-testid="stAppViewContainer"], .stMarkdown, button, input, textarea {
+    font-family: 'Inter', -apple-system, system-ui, sans-serif;
+}
+h1, h2, h3, h4 {
+    font-family: 'Source Serif 4', Georgia, 'Times New Roman', serif !important;
+    color: var(--nm-tinta) !important;
+    letter-spacing: -.01em;
+}
+.block-container { padding-top: 1.4rem; max-width: 1220px; }
+[data-testid="stAppDeployButton"] { display: none; }
+
+/* ---------- cabeçalho institucional ---------- */
+.nm-banner {
+    display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+    background: var(--nm-tinta); color: #fff;
+    padding: 20px 28px; border-radius: 10px 10px 0 0;
+}
+.nm-brasao {
+    width: 54px; height: 54px; flex: 0 0 54px; border-radius: 50%;
+    background: var(--nm-ouro); color: var(--nm-tinta);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Source Serif 4', serif; font-weight: 700; font-size: 21px;
+}
+.nm-instituicao {
+    font-family: 'Source Serif 4', serif; font-size: 26px;
+    font-weight: 700; line-height: 1.08; color: #fff;
+}
+.nm-unidade { font-size: 12.5px; color: #C9D4E8; letter-spacing: .04em; margin-top: 4px; }
+.nm-selo {
+    margin-left: auto; text-align: right; font-size: 10.5px;
+    letter-spacing: .17em; text-transform: uppercase;
+    color: var(--nm-ouro); font-weight: 700; line-height: 1.5;
+}
+.nm-selo span {
+    display: block; color: #8FA3C9; letter-spacing: .04em;
+    text-transform: none; font-weight: 400; font-size: 11.5px; margin-top: 4px;
+}
+.nm-regua { height: 4px; background: var(--nm-ouro); border-radius: 0 0 3px 3px; }
+@media (max-width: 920px) { .nm-selo { display: none; } }
+.nm-trilha { font-size: 12px; color: var(--nm-cinza); margin: 14px 0 4px; }
+
+/* ---------- seções numeradas ---------- */
+.nm-secao { margin: 26px 0 12px; border-top: 1px solid var(--nm-borda); padding-top: 18px; }
+.nm-etapa {
+    font-size: 10.5px; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--nm-ouro); font-weight: 700;
+}
+.nm-secao h2 { margin: 5px 0 2px; font-size: 26px; }
+.nm-secao p { margin: 0; color: var(--nm-cinza); font-size: 13.5px; }
+
+/* ---------- blocos de conteúdo ---------- */
 .bloco-item {
-    border: 1px solid rgba(128,128,128,.28);
-    border-radius: 10px;
-    padding: 14px 16px;
-    margin-bottom: 12px;
+    background: var(--nm-palha); border: 1px solid var(--nm-borda);
+    border-radius: 8px; padding: 14px 18px; margin-bottom: 10px;
+}
+.bloco-item b {
+    font-family: 'Source Serif 4', serif; font-size: 17px; color: var(--nm-tinta);
 }
 .rotulo {
-    font-size: .74rem;
-    text-transform: uppercase;
-    letter-spacing: .06em;
-    opacity: .65;
-    margin-bottom: 4px;
+    font-size: 10.5px; letter-spacing: .15em; text-transform: uppercase;
+    color: var(--nm-ouro); font-weight: 700; margin-bottom: 5px; opacity: 1;
 }
-.dica { font-size: .9rem; opacity: .8; font-style: italic; margin-top: 8px; }
+.dica { font-size: .9rem; color: var(--nm-cinza); font-style: italic; margin-top: 8px; }
+
+/* ---------- componentes do Streamlit ---------- */
+[data-testid="stSidebar"] { background: var(--nm-palha); border-right: 1px solid var(--nm-borda); }
+[data-testid="stSidebar"] h2 { font-size: 19px; }
+[data-testid="stMetricValue"] { font-family: 'Source Serif 4', serif; color: var(--nm-tinta); }
+[data-testid="stMetricLabel"] p {
+    text-transform: uppercase; letter-spacing: .1em; font-size: 11px; color: var(--nm-cinza);
+}
+.stTabs [data-baseweb="tab-list"] { border-bottom: 1px solid var(--nm-borda); }
+.stTabs [data-baseweb="tab"] { font-size: 14px; font-weight: 500; }
+.stButton > button { border-radius: 6px; font-weight: 600; }
+.stDownloadButton > button { border-radius: 6px; font-weight: 500; }
+.stDownloadButton > button[kind="secondary"] {
+    border: 1px solid var(--nm-borda); background: #fff;
+}
+.stDownloadButton > button[kind="secondary"]:hover {
+    border-color: var(--nm-tinta); color: var(--nm-tinta);
+}
+.stDownloadButton > button[kind="primary"] {
+    background: var(--nm-tinta); border: 1px solid var(--nm-tinta);
+    color: #fff; font-weight: 600;
+}
+.stDownloadButton > button[kind="primary"]:hover {
+    background: var(--nm-tinta-clara); border-color: var(--nm-tinta-clara);
+}
+
+/* ---------- rodapé ---------- */
+.nm-rodape {
+    margin-top: 42px; padding: 18px 0 8px; border-top: 1px solid var(--nm-borda);
+    font-size: 12px; color: var(--nm-cinza); line-height: 1.7;
+}
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
+
+
+def secao(etapa: str, titulo: str, descricao: str = "") -> None:
+    """Cabeçalho de seção no padrão institucional."""
+    apoio = f"<p>{descricao}</p>" if descricao else ""
+    st.markdown(
+        f"<div class='nm-secao'><span class='nm-etapa'>{etapa}</span>"
+        f"<h2>{titulo}</h2>{apoio}</div>",
+        unsafe_allow_html=True,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -82,10 +189,24 @@ for chave, inicial in [
 # Cabeçalho
 # ---------------------------------------------------------------------------
 
-st.title("🧠 NovaMente")
-st.caption(
-    "Sistema Inteligente de Adaptação e Geração de Conteúdo Educacional · "
-    "RAG + Orquestração de Agentes · Hackathon ONE G10"
+st.markdown(
+    """
+    <div class="nm-banner">
+      <div class="nm-brasao">NM</div>
+      <div>
+        <div class="nm-instituicao">NovaMente</div>
+        <div class="nm-unidade">Núcleo de Adaptação de Conteúdo Educacional</div>
+      </div>
+      <div class="nm-selo">Hackathon ONE G10
+        <span>Oracle Next Education &amp; Alura</span>
+      </div>
+    </div>
+    <div class="nm-regua"></div>
+    <div class="nm-trilha">
+      Início › Núcleo de Conteúdo Educacional › Gerador de material didático
+    </div>
+    """,
+    unsafe_allow_html=True,
 )
 
 cfg = get_settings()
@@ -96,6 +217,7 @@ cfg = get_settings()
 
 with st.sidebar:
     st.header("Parâmetros de adaptação")
+    st.caption("Os três eixos definem como o mesmo documento é reescrito.")
 
     perfil = st.selectbox(
         "Perfil do destinatário",
@@ -125,7 +247,12 @@ with st.sidebar:
 # Entrada do documento
 # ---------------------------------------------------------------------------
 
-st.subheader("1. Documento técnico de entrada")
+secao(
+    "Etapa 1",
+    "Documento técnico de entrada",
+    "A fonte de toda a geração. O material produzido é ancorado "
+    "exclusivamente neste documento.",
+)
 
 exemplos = sorted((RAIZ / "docs" / "fontes").glob("*")) if (RAIZ / "docs" / "fontes").exists() else []
 nomes_exemplos = [e.name for e in exemplos if e.is_file()]
@@ -192,7 +319,12 @@ with aba_exemplo:
 # Execução
 # ---------------------------------------------------------------------------
 
-st.subheader("2. Gerar material didático")
+secao(
+    "Etapa 2",
+    "Geração do material didático",
+    "Quatro agentes em sequência: roteiro pedagógico, recuperação de contexto, "
+    "redação e auditoria de fidelidade.",
+)
 
 col_botao, col_info = st.columns([1, 3])
 with col_botao:
@@ -252,8 +384,11 @@ resposta = st.session_state.get("resposta")
 diag = st.session_state.get("diagnostico")
 
 if resposta is not None:
-    st.divider()
-    st.subheader("3. Resultado")
+    secao(
+        "Etapa 3",
+        "Material gerado",
+        "Revise o conteúdo, confira a procedência e exporte no formato de uso.",
+    )
 
     m = resposta.metadados
     a = resposta.avaliacao_qualidade
@@ -428,40 +563,87 @@ if resposta is not None:
 
     # ---------------------------- Exportar ----------------------------
     with abas[4]:
-        nome_base = resposta.conteudo_adaptado.titulo.replace(" ", "_")[:50] or "novamente"
+        nome_base = (
+            resposta.conteudo_adaptado.titulo.replace(" ", "_")[:50] or "novamente"
+        )
 
-        st.download_button(
-            "⬇️ JSON estruturado",
-            data=json.dumps(resposta.model_dump(mode="json"), ensure_ascii=False, indent=2),
-            file_name=f"{nome_base}.json",
-            mime="application/json",
-            use_container_width=True,
-        )
-        st.download_button(
-            "⬇️ Markdown",
-            data=para_markdown(resposta),
-            file_name=f"{nome_base}.md",
-            mime="text/markdown",
-            use_container_width=True,
-        )
-        st.download_button(
-            "⬇️ CSV para Anki",
-            data=para_csv_anki(resposta),
-            file_name=f"{nome_base}_anki.csv",
-            mime="text/csv",
-            use_container_width=True,
+        st.markdown("#### Apresentação de aula")
+        st.caption(
+            "Um slide por item, com capa, ficha do material, divisória de conteúdo "
+            "e slide de procedência. Abre no PowerPoint, no Google Slides e no Keynote."
         )
         try:
             st.download_button(
-                "⬇️ PDF didático",
-                data=para_pdf(resposta),
-                file_name=f"{nome_base}.pdf",
-                mime="application/pdf",
+                "🎓 Baixar apresentação (.pptx)",
+                data=para_pptx(resposta),
+                file_name=f"{nome_base}.pptx",
+                mime=(
+                    "application/vnd.openxmlformats-officedocument."
+                    "presentationml.presentation"
+                ),
+                type="primary",
                 use_container_width=True,
             )
         except RuntimeError as exc:
-            st.caption(f"PDF indisponível: {exc}")
+            st.warning(f"Apresentação indisponível: {exc}")
+
+        st.markdown("#### Outros formatos")
+        coluna_a, coluna_b = st.columns(2)
+
+        with coluna_a:
+            try:
+                st.download_button(
+                    "📄 PDF didático",
+                    data=para_pdf(resposta),
+                    file_name=f"{nome_base}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                )
+            except RuntimeError as exc:
+                st.caption(f"PDF indisponível: {exc}")
+            st.download_button(
+                "📝 Markdown",
+                data=para_markdown(resposta),
+                file_name=f"{nome_base}.md",
+                mime="text/markdown",
+                use_container_width=True,
+            )
+
+        with coluna_b:
+            st.download_button(
+                "🗂️ CSV para Anki",
+                data=para_csv_anki(resposta),
+                file_name=f"{nome_base}_anki.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
+            st.download_button(
+                "🧾 JSON estruturado",
+                data=json.dumps(
+                    resposta.model_dump(mode="json"), ensure_ascii=False, indent=2
+                ),
+                file_name=f"{nome_base}.json",
+                mime="application/json",
+                use_container_width=True,
+            )
 
         st.divider()
-        st.markdown("**Persistência**")
+        st.markdown("**Persistência na nuvem**")
         st.json(resposta.armazenamento_oci.model_dump(mode="json"))
+
+
+# ---------------------------------------------------------------------------
+# Rodapé institucional
+# ---------------------------------------------------------------------------
+
+st.markdown(
+    """
+    <div class="nm-rodape">
+      <b>NovaMente</b> · Núcleo de Adaptação de Conteúdo Educacional<br>
+      Hackathon ONE G10 — Oracle Next Education &amp; Alura · Grupo 10<br>
+      Todo material é gerado a partir do documento enviado e auditado por
+      verificação de fidelidade em duas camadas. Revise antes de usar em turma.
+    </div>
+    """,
+    unsafe_allow_html=True,
+)

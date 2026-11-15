@@ -1,0 +1,15 @@
+# Tema institucional do NovaMente.
+# As cores acompanham a identidade usada no PPTX exportado (app/export/slides.py).
+
+[theme]
+base = "light"
+primaryColor = "#16254C"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F2F5FA"
+textColor = "#1F2733"
+
+[server]
+headless = true
+
+[browser]
+gatherUsageStats = false

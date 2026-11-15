@@ -199,7 +199,8 @@ Ingestão de PDF: pypdf.
 Tipagem e validação: Pydantic v2 e pydantic-settings.
 API: FastAPI com Uvicorn.
 Interface: Streamlit.
-Exportação: reportlab para PDF e o módulo csv para o formato do Anki.
+Exportação: python-pptx para a apresentação de aula, reportlab para PDF e o
+módulo csv para o formato do Anki.
 Nuvem: OCI Object Storage na camada Always Free.
 Deploy: Docker, com Railway e OCI Compute como destinos.
 
@@ -211,14 +212,23 @@ Pedagógico e Crítico/Revisor, incluindo aresta condicional de revisão.
 Quiz com avaliação em tempo real: o aluno responde na interface e recebe
 imediatamente a justificativa do gabarito, com placar de desempenho.
 
-Exportação multiformato: Markdown, PDF didático formatado e CSV compatível com
-o Anki.
+Exportação multiformato: apresentação PowerPoint, Markdown, PDF didático
+formatado e CSV compatível com o Anki.
+
+A apresentação é montada por código, sem template externo: capa, ficha do
+material, mapa de conceitos, divisória de seção, um slide por item pedagógico e
+um slide de procedência com o score de ancoragem. No quiz, cada questão gera um
+slide de pergunta e um de gabarito comentado. O corpo de texto tem o tamanho de
+fonte calculado a partir da área disponível, com piso de 14 pt; quando nem no
+piso o conteúdo cabe, o slide ganha uma continuação em vez de cortar o texto.
 
 ## 8. Qualidade e testes
 
-O projeto tem 29 testes automatizados que não consomem quota da API. Eles
+O projeto tem 33 testes automatizados que não consomem quota da API. Eles
 validam o contrato de dados contra os exemplos literais do briefing, a
-segmentação com sobreposição, a detecção de números órfãos e os exportadores.
+segmentação com sobreposição, a detecção de números órfãos e os exportadores,
+inclusive a montagem da apresentação: número de slides, pergunta e gabarito
+separados no quiz e geração de slide de continuação para textos longos.
 
 Um desses testes revelou um defeito real durante o desenvolvimento: as chaves do
 JSON estavam sendo contadas como vocabulário técnico na métrica de cobertura,
