@@ -10,8 +10,16 @@ import streamlit as st
 
 # permite rodar com `streamlit run ui/app.py` a partir da raiz do projeto
 RAIZ = Path(__file__).resolve().parents[1]
-if str(RAIZ) not in sys.path:
-    sys.path.insert(0, str(RAIZ))
+if str(RAIZ) in sys.path:
+    sys.path.remove(str(RAIZ))
+sys.path.insert(0, str(RAIZ))
+
+# O Streamlit registra o proprio script em sys.modules com o nome do arquivo.
+# Como este arquivo se chama "app.py", esse registro sequestra o nome "app" e
+# quebra "import app.core". Removemos o registro quando ele nao for o pacote.
+_conflito = sys.modules.get("app")
+if _conflito is not None and not hasattr(_conflito, "__path__"):
+    del sys.modules["app"]
 
 from app.core.config import get_settings  # noqa: E402
 from app.export.exporters import para_csv_anki, para_markdown, para_pdf  # noqa: E402
