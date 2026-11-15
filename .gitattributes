@@ -1,0 +1,16 @@
+# Normaliza finais de linha: LF no repositório, nativo no working tree.
+* text=auto eol=lf
+
+*.py   text eol=lf
+*.md   text eol=lf
+*.txt  text eol=lf
+*.json text eol=lf
+*.sh   text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+
+Dockerfile text eol=lf
+
+*.pdf binary
+*.png binary
+*.jpg binary

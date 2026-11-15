@@ -1,0 +1,40 @@
+# Ambiente virtual
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Segredos — NUNCA commitar
+.env
+.env.local
+*.pem
+oci_api_key.pem
+~/.oci/
+
+# Vector store persistido
+chroma_db/
+.chroma/
+vector_store/
+
+# Uploads e saídas geradas em runtime
+uploads/
+output/
+storage_local/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# OS
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# O briefing original fica versionado apenas em docs/briefing/ (evita 4 MB duplicados)
+/Nova_Mente.pdf

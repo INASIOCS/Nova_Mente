@@ -1,0 +1,33 @@
+# --- API e interface ---
+fastapi
+uvicorn[standard]
+python-multipart
+streamlit
+
+# --- Tipagem e configuração ---
+pydantic
+pydantic-settings
+python-dotenv
+
+# --- LLM, RAG e orquestração de agentes ---
+langchain
+langchain-core
+langchain-google-genai
+langgraph
+google-generativeai
+
+# --- Vector Store ---
+chromadb
+numpy
+
+# --- Ingestão de documentos ---
+pypdf
+
+# --- Exportação multiformato ---
+reportlab
+
+# --- Oracle Cloud Infrastructure ---
+oci
+
+# --- Utilitários ---
+requests
