@@ -1,0 +1,145 @@
+ORACLE CLOUD INFRASTRUCTURE OBJECT STORAGE — CONCEITOS E OPERACOES
+
+1. VISAO GERAL
+
+O Object Storage da Oracle Cloud Infrastructure e um servico de armazenamento de
+objetos altamente durave l e escalavel. Diferente de um sistema de arquivos
+tradicional, ele nao organiza os dados em uma hierarquia de diretorios reais:
+armazena cada arquivo como um objeto identificado por uma chave unica dentro de
+um container chamado bucket.
+
+O servico e projetado para dados nao estruturados de qualquer tipo e tamanho:
+documentos, imagens, backups, logs, arquivos de dados analiticos e artefatos
+gerados por aplicacoes. Os dados sao replicados automaticamente para garantir
+durabilidade, sem que o usuario precise configurar replicacao.
+
+2. NAMESPACE, COMPARTIMENTO E BUCKET
+
+Tres conceitos organizam o servico:
+
+- Namespace: um identificador unico e global atribuido a cada tenancy no momento
+  da criacao da conta. O namespace funciona como o container de mais alto nivel
+  do Object Storage e nao pode ser alterado.
+
+- Compartimento: a unidade logica de organizacao e de controle de acesso da OCI.
+  Buckets sao criados dentro de um compartimento, e as politicas de IAM concedem
+  permissoes por compartimento.
+
+- Bucket: o container onde os objetos ficam armazenados. O nome do bucket deve
+  ser unico dentro do namespace e da regiao. Um bucket pertence a uma unica
+  regiao e nao pode ser movido para outra.
+
+3. OBJETOS E CHAVES
+
+Cada objeto possui:
+
+- Um nome (tambem chamado de chave), que o identifica de forma unica no bucket.
+- O conteudo binario propriamente dito.
+- Metadados definidos pelo sistema, como tamanho, data de criacao e checksum.
+- Metadados opcionais definidos pelo usuario, enviados como pares chave-valor.
+- Um content type, que informa aos clientes como interpretar o conteudo.
+
+Embora o Object Storage nao tenha diretorios de verdade, e pratica comum usar a
+barra no nome do objeto para simular uma hierarquia. Um objeto chamado
+"relatorios/2026/novembro/resumo.json" aparece na console agrupado como se
+estivesse em pastas aninhadas, mas internamente a chave e apenas essa string.
+Esse padrao de prefixos tambem permite listar objetos por prefixo, o que e a
+forma eficiente de navegar em buckets com muitos objetos.
+
+4. CAMADAS DE ARMAZENAMENTO
+
+O servico oferece camadas com custos e caracteristicas de acesso diferentes:
+
+- Standard: para dados acessados com frequencia. Leitura imediata.
+- Infrequent Access: para dados acessados raramente. Custo de armazenamento mais
+  baixo e custo de recuperacao mais alto.
+- Archive: para retencao de longo prazo. O objeto precisa ser restaurado antes de
+  ser lido, operacao que leva tempo e nao e instantanea.
+
+A camada pode ser definida no bucket e, em alguns casos, por objeto. Regras de
+ciclo de vida permitem mover objetos automaticamente entre camadas ou excluir
+objetos antigos, com base no tempo desde a criacao.
+
+5. CONTROLE DE ACESSO
+
+Por padrao, um bucket e privado: nenhum acesso anonimo e permitido. O acesso pode
+ser concedido de tres formas:
+
+- Politicas de IAM: concedem permissao a grupos de usuarios ou a principais de
+  servico sobre buckets de um compartimento. E a forma recomendada para acesso
+  programatico de aplicacoes.
+
+- Pre-Authenticated Request (PAR): gera uma URL temporaria que permite ler ou
+  gravar um objeto especifico, ou todo um bucket, sem credenciais. A URL tem data
+  de expiracao definida na criacao. E util para compartilhar um arquivo com
+  alguem de fora ou permitir upload direto de um cliente. Qualquer pessoa com a
+  URL tem o acesso concedido, portanto ela deve ser tratada como um segredo.
+
+- Acesso publico de leitura: pode ser habilitado no bucket, tornando os objetos
+  legiveis por qualquer pessoa na internet. Deve ser usado com cautela e nunca
+  para dados sensiveis.
+
+6. OPERACOES BASICAS VIA SDK
+
+O SDK do OCI para Python expoe o servico pela classe ObjectStorageClient. O fluxo
+tipico de uma aplicacao e:
+
+- Carregar a configuracao de autenticacao, normalmente a partir do arquivo de
+  configuracao do OCI CLI, que contem o OCID do usuario, o OCID da tenancy, a
+  impressao digital da chave de API, o caminho da chave privada e a regiao.
+- Instanciar o cliente do Object Storage com essa configuracao.
+- Obter o namespace da tenancy.
+- Chamar put_object para gravar, informando namespace, nome do bucket, nome do
+  objeto e o corpo do conteudo.
+- Chamar get_object para ler, list_objects para listar e delete_object para
+  excluir.
+
+Quando a aplicacao roda dentro da propria OCI, e preferivel usar Instance
+Principal ou Resource Principal em vez de chaves de API. Nesse modelo, a propria
+instancia recebe uma identidade e as credenciais sao rotacionadas
+automaticamente, eliminando a necessidade de distribuir e guardar chaves
+privadas.
+
+7. UPLOAD DE ARQUIVOS GRANDES
+
+Para arquivos grandes, o Object Storage suporta upload em varias partes
+(multipart upload). O arquivo e dividido em partes enviadas de forma
+independente, possivelmente em paralelo, e depois consolidadas em um unico
+objeto. Alem de acelerar o envio, essa abordagem permite retomar um upload
+interrompido reenviando apenas as partes que falharam.
+
+8. VERSIONAMENTO E PROTECAO DE DADOS
+
+O versionamento pode ser habilitado por bucket. Com ele ativo, sobrescrever um
+objeto nao destroi o conteudo anterior: uma nova versao e criada e as anteriores
+continuam recuperaveis. Isso protege contra sobrescrita acidental e contra
+exclusao indevida, ao custo de mais espaco consumido.
+
+A replicacao entre regioes pode ser configurada para copiar automaticamente os
+objetos de um bucket para um bucket em outra regiao, atendendo requisitos de
+recuperacao de desastre.
+
+9. CAMADA ALWAYS FREE
+
+A Oracle oferece uma camada Always Free que inclui uma cota de Object Storage sem
+custo, valida enquanto a conta existir. Os limites exatos de capacidade e de
+numero de requisicoes constam na documentacao oficial da Oracle e podem mudar;
+antes de dimensionar uma solucao, convem conferir a pagina atual do programa.
+
+Para um projeto academico ou um prototipo, a recomendacao pratica e: usar um
+unico bucket na camada Standard, manter os objetos pequenos, evitar replicacao
+entre regioes e revisar periodicamente o consumo na console para garantir que a
+solucao permanece dentro da gratuidade.
+
+10. BOAS PRATICAS
+
+- Use prefixos consistentes nos nomes dos objetos para organizar o bucket e
+  permitir listagem eficiente por prefixo.
+- Nunca deixe um bucket com acesso publico de escrita.
+- Prefira Instance Principal ou Resource Principal a chaves de API quando a
+  aplicacao roda na OCI.
+- Defina regras de ciclo de vida desde o inicio, para que dados antigos nao
+  acumulem custo indefinidamente.
+- Habilite versionamento em buckets que guardam dados que nao podem ser perdidos.
+- Trate URLs de Pre-Authenticated Request como credenciais: elas concedem acesso
+  a quem as possuir, ate a data de expiracao.
