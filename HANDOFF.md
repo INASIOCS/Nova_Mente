@@ -35,10 +35,15 @@ fiel, versionado em `examples/`.
   embeddings Gemini, ChromaDB), orquestração LangGraph com 4 agentes,
   verificação anti-alucinação em 2 camadas, validação Pydantic estrita,
   storage abstraído (local + OCI), FastAPI, Streamlit com quiz interativo,
-  exportação Markdown/PDF/CSV-Anki, Docker e configuração Railway.
-- **TESTED:** 29 testes automatizados passando (`python -m pytest tests -q`);
+  exportação em apresentação .pptx, Markdown, PDF e CSV-Anki, Docker e
+  configuração Railway.
+- **TESTED:** 33 testes automatizados passando (`python -m pytest tests -q`);
   `compileall` sem erros; 4 cenários de demonstração executados de ponta a ponta
   contra a API real.
+- **VERIFIED (15/11):** os 4 decks dos cenários de `examples/` foram
+  renderizados em PNG pelo PowerPoint e conferidos slide a slide, junto com
+  um deck de casos-limite (título de três linhas, corpo longo, comando
+  extenso): sem estouro de caixa, sem sobreposição e sem texto cortado.
 - **VERIFIED:** material do cenário 1 inspecionado manualmente — tecnicamente
   correto e adequado ao perfil iniciante. Chave do Gemini validada. Modelos
   disponíveis confirmados por `list_models`. `.env` confirmado fora do Git.
@@ -393,13 +398,17 @@ Todo o pipeline está implementado, testado e commitado. Nada pendente.
 | `app/storage/oci_storage.py` | created | **Nunca executado contra o OCI real.** |
 | `app/pipeline.py` | created | Orquestração de ponta a ponta + diagnóstico. |
 | `app/api/main.py` | created | FastAPI. `GET /saude` mostra os backends ativos. |
-| `ui/app.py` | created | Streamlit, inclui a aba de quiz interativo. |
+| `ui/app.py` | created | Streamlit com identidade institucional; aba de quiz interativo. |
+| `app/export/slides.py` | created | Deck .pptx montado por código, sem template externo. |
+| `.streamlit/config.toml` | created | Tema (navy/ouro) alinhado ao deck. |
+| `.claude/launch.json` | created | Sobe a interface (8501) e a API (8000) localmente. |
+| `scripts/gerar_pdf_documentacao.py` | created | Refaz `docs/NovaMente_Documentacao.pdf`. |
 | `examples/` | created | 4 cenários reais (JSON + Markdown) + `RESUMO.json`. |
 | `docs/fontes/` | created | 3 documentos da OCI: `.md`, `.txt` e `.pdf`. |
 | `docs/arquitetura.md` | created | Diagramas Mermaid e decisões de projeto. |
 | `.env` | created | **Não versionado.** Contém a `GOOGLE_API_KEY`. |
 | `Dockerfile`, `entrypoint.sh`, `railway.json` | created | Deploy; `SERVICE=ui\|api`. |
-| `tests/` | created | 29 testes, sem consumo de quota. |
+| `tests/` | created | 33 testes, sem consumo de quota. |
 
 ---
 
