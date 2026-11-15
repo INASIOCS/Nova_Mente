@@ -30,12 +30,10 @@ from app.agents.fidelity import (
     verificar_fidelidade,
 )
 from app.agents.llm import ErroLLM, get_cliente_llm
+from app.core.config import get_settings
 from app.rag.retriever import ContextoRecuperado, recuperar_contexto
 
 logger = logging.getLogger(__name__)
-
-LIMITE_REVISAO = 0.80
-MAX_REVISOES = 1
 
 
 class EstadoNovaMente(TypedDict, total=False):
@@ -69,6 +67,11 @@ class EstadoNovaMente(TypedDict, total=False):
 def no_roteador(estado: EstadoNovaMente) -> EstadoNovaMente:
     """Agente Roteador: monta o plano didático a partir de uma amostra do doc."""
     trace = list(estado.get("trace", []))
+
+    if not get_settings().agente_roteador_ativo:
+        trace.append("roteador: desativado (modo econômico de quota)")
+        return {**estado, "plano": {}, "trace": trace}
+
     cliente = get_cliente_llm()
 
     amostra = estado["conteudo"][:6000]
@@ -211,15 +214,16 @@ def no_critico(estado: EstadoNovaMente) -> EstadoNovaMente:
 
 
 def decidir_proximo(estado: EstadoNovaMente) -> str:
-    """Aresta condicional: revisar uma vez ou finalizar."""
+    """Aresta condicional: revisar ou finalizar."""
+    cfg = get_settings()
     avaliacao = estado.get("avaliacao", {})
     score = float(avaliacao.get("ancoragem_fonte_score", 1.0) or 0.0)
     pediu_revisao = bool(avaliacao.get("precisa_revisao", False))
     revisoes = estado.get("revisoes", 0)
 
-    if revisoes >= MAX_REVISOES:
+    if revisoes >= cfg.max_revisoes:
         return "finalizar"
-    if score < LIMITE_REVISAO or pediu_revisao:
+    if score < cfg.limite_revisao or pediu_revisao:
         return "revisar"
     return "finalizar"
 

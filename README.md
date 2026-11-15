@@ -143,6 +143,10 @@ TOP_K=5
 
 STORAGE_BACKEND=local          # "local" ou "oci"
 OCI_BUCKET_NAME=novamente-conteudos-educativos
+
+AGENTE_ROTEADOR_ATIVO=true     # false economiza 1 chamada por execução
+MAX_REVISOES=1                 # 0 desativa a rodada de revisão
+LIMITE_REVISAO=0.80            # score de ancoragem que dispara a revisão
 ```
 
 > O arquivo `.env` está no `.gitignore` e **nunca** deve ser commitado.
@@ -251,7 +255,59 @@ adaptado para perfis e formatos diferentes — é a prova direta da capacidade d
 adaptação exigida pelo checklist. Os cenários 4 e 5 exercitam os outros dois
 formatos de ingestão (texto bruto e PDF).
 
-<!-- RESULTADOS_DEMO -->
+### Resultados das execuções
+
+Execuções reais registradas em 15/11/2026, com `gemini-3.5-flash` e embeddings
+`gemini-embedding-001`:
+
+| # | Documento | Ingestão | Perfil | Formato | Itens | Ancoragem | Clareza | Tempo |
+|---|---|---|---|---|---|---|---|---|
+| 1 | VCN | Markdown | Iniciante | Flashcards | 7 | **0.82** | Alta | 45,3s |
+| 2 | VCN | Markdown | Líder Técnico / Arquiteto | Resumo Executivo | 5 | **0.81** | Alta | 53,5s |
+| 3 | VCN | Markdown | Desenvolvedor Júnior / Pleno | Quiz | 5 | **0.82** | Alta | 38,3s |
+| 4 | Object Storage | Texto bruto | Gestor / Executivo (Não Técnico) | Resumo Executivo | 5 | **0.73** | Alta | 144,9s |
+| 5 | IAM | PDF | Desenvolvedor Júnior / Pleno | Tutorial | — | — | — | pendente de quota |
+
+**Leitura dos resultados.** Os cenários 1, 2 e 3 provam o requisito central: o
+mesmo documento de VCN gerou três materiais distintos, em três formatos, para
+três perfis — de analogias para iniciantes a trade-offs de arquitetura.
+
+O cenário 4 é o mais instrutivo. Sua ancoragem de **0.73** ficou abaixo do limite
+de 0.80 e **disparou a rodada de revisão** do Agente Crítico, o que explica os
+144,9s: foram cinco chamadas ao modelo em vez de três. O score permaneceu baixo
+porque um resumo para público executivo necessariamente traduz termos técnicos em
+linguagem de negócio, reduzindo a sobreposição léxica com a fonte. O mecanismo
+funcionou como projetado: sinalizou o afastamento da fonte em vez de mascará-lo.
+
+O cenário 5 não foi gerado porque a cota diária da API foi atingida (ver abaixo).
+Para completá-lo, com a cota renovada:
+
+```bash
+python scripts/gerar_exemplos.py 5
+```
+
+> O checklist exige no mínimo **3** exemplos de execução; há **4** versionados.
+
+### ⚠️ Limite de cota do Gemini (importante para a demonstração)
+
+O free tier da API do Gemini permite cerca de **20 requisições de geração por
+dia, por modelo**. O consumo do NovaMente por execução é:
+
+| Configuração | Chamadas por execução |
+|---|---|
+| Completa (Roteador + Redator + Crítico) | 3 |
+| Completa **com** rodada de revisão | 5 |
+| Modo econômico (`AGENTE_ROTEADOR_ATIVO=false`, `MAX_REVISOES=0`) | 2 |
+
+Isso significa cerca de **6 demonstrações ao vivo por dia** na configuração
+completa. Para uma apresentação, há três recomendações:
+
+1. Use os exemplos já versionados em `examples/` em vez de gerar ao vivo.
+2. Ative o modo econômico no `.env` antes de demonstrar.
+3. Reserve a geração ao vivo para um único cenário.
+
+Ao estourar a cota, a API devolve `429` e o pipeline propaga uma mensagem de erro
+explícita com o tempo de espera, em vez de falhar silenciosamente.
 
 ### Documentos técnicos de origem
 
