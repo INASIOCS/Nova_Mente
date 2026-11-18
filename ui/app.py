@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import streamlit as st
@@ -44,6 +45,7 @@ from app.ingestion.loader import (  # noqa: E402
     carregar_bytes,
     carregar_texto,
 )
+from app.agents.llm import ErroQuota  # noqa: E402
 from app.pipeline import ErroPipeline, adaptar_conteudo  # noqa: E402
 from app.schemas.content import (  # noqa: E402
     FormatoSaida,
@@ -51,6 +53,7 @@ from app.schemas.content import (  # noqa: E402
     NivelDetalhe,
     PerfilDestinatario,
     RequisicaoAdaptacao,
+    RespostaAdaptacao,
 )
 
 st.set_page_config(
@@ -182,6 +185,86 @@ def secao(etapa: str, titulo: str, descricao: str = "") -> None:
     )
 
 
+# Brasil não adota horário de verão desde 2019, então o deslocamento fixo é
+# exato — e evita depender do banco de fusos do sistema, que não existe em
+# toda imagem de contêiner.
+FUSO_BRASILIA = timezone(timedelta(hours=-3))
+
+MATERIAIS_PRONTOS = sorted((RAIZ / "examples").glob("cenario-*.json"))
+
+
+def _duracao_legivel(segundos: int) -> str:
+    horas, resto = divmod(max(segundos, 0), 3600)
+    minutos = resto // 60
+    if horas and minutos:
+        return f"{horas}h{minutos:02d}"
+    if horas:
+        return f"{horas}h"
+    return f"{minutos} min"
+
+
+def painel_de_cota(segundos: int | None) -> None:
+    """Explica o 429 do Gemini em vez de despejar o erro da API na tela.
+
+    O tempo vem do `retry_delay` da própria resposta, então a mensagem continua
+    correta em qualquer dia: não há data nem horário fixo no código.
+    """
+    if segundos:
+        volta = datetime.now(FUSO_BRASILIA) + timedelta(seconds=segundos)
+        quando = (
+            f"A cota volta por volta das **{volta:%H:%M}** "
+            f"(horário de Brasília), em cerca de {_duracao_legivel(segundos)}."
+        )
+    else:
+        quando = (
+            "A cota volta à meia-noite no horário do Pacífico — **05:00** em "
+            "Brasília."
+        )
+
+    st.warning(
+        "**A cota diária do Gemini acabou.**\n\n"
+        "O plano gratuito permite 20 gerações por dia para o projeto inteiro, "
+        "e não por pessoa. Isto não é uma falha do NovaMente: o pipeline parou "
+        "na primeira recusa da API, de propósito, porque toda tentativa — "
+        "inclusive a que falha — consome o saldo do dia.\n\n"
+        f"{quando}"
+    )
+
+    if not MATERIAIS_PRONTOS:
+        return
+
+    st.markdown(
+        "Enquanto isso, veja um material **já gerado** por este sistema, "
+        "com a auditoria de fidelidade que ele recebeu na execução real:"
+    )
+    col_escolha, col_botao = st.columns([3, 1])
+    with col_escolha:
+        escolhido = st.selectbox(
+            "Material pronto",
+            MATERIAIS_PRONTOS,
+            format_func=lambda caminho: caminho.stem.replace("-", " ").capitalize(),
+            label_visibility="collapsed",
+            key="material_pronto",
+        )
+    with col_botao:
+        abrir = st.button("Abrir material", use_container_width=True)
+
+    if abrir and escolhido is not None:
+        try:
+            dados = json.loads(escolhido.read_text(encoding="utf-8"))
+            st.session_state["resposta"] = RespostaAdaptacao.model_validate(
+                dados["resposta"]
+            )
+            # Sem diagnóstico: estes números vieram de uma execução anterior e
+            # exibi-los como se fossem desta sessão seria enganoso.
+            st.session_state["diagnostico"] = None
+            st.session_state["respostas_quiz"] = {}
+            st.session_state["material_e_exemplo"] = escolhido.name
+            st.rerun()
+        except Exception as exc:  # noqa: BLE001
+            st.error(f"Não consegui abrir o material de exemplo: {exc}")
+
+
 # ---------------------------------------------------------------------------
 # Estado
 # ---------------------------------------------------------------------------
@@ -190,6 +273,7 @@ for chave, inicial in [
     ("resposta", None),
     ("diagnostico", None),
     ("respostas_quiz", {}),
+    ("quota_esgotada", None),
 ]:
     if chave not in st.session_state:
         st.session_state[chave] = inicial
@@ -351,6 +435,7 @@ with col_info:
         )
 
 if gerar and documento is not None:
+    st.session_state["quota_esgotada"] = None
     try:
         requisicao = RequisicaoAdaptacao(
             documento_titulo=documento.titulo,
@@ -377,13 +462,26 @@ if gerar and documento is not None:
                 st.session_state["resposta"] = resposta
                 st.session_state["diagnostico"] = diag
                 st.session_state["respostas_quiz"] = {}
+                st.session_state["material_e_exemplo"] = None
                 status.update(label="Pipeline concluído", state="complete")
+            except ErroQuota as exc:
+                # Não é erro do sistema: é limite da API. O painel abaixo
+                # explica e oferece um material já gerado.
+                status.update(
+                    label="Cota diária do Gemini esgotada", state="error"
+                )
+                st.session_state["quota_esgotada"] = {"segundos": exc.segundos}
             except ErroPipeline as exc:
                 status.update(label="Falha no pipeline", state="error")
                 st.error(str(exc))
             except Exception as exc:  # noqa: BLE001
                 status.update(label="Erro inesperado", state="error")
                 st.error(f"{type(exc).__name__}: {exc}")
+
+
+cota_esgotada = st.session_state.get("quota_esgotada")
+if cota_esgotada is not None:
+    painel_de_cota(cota_esgotada.get("segundos"))
 
 
 # ---------------------------------------------------------------------------
@@ -399,6 +497,14 @@ if resposta is not None:
         "Material gerado",
         "Revise o conteúdo, confira a procedência e exporte no formato de uso.",
     )
+
+    if st.session_state.get("material_e_exemplo"):
+        st.info(
+            "Este material veio de uma **execução real anterior**, versionada "
+            "no repositório em `examples/`. Os números de qualidade abaixo são "
+            "os daquela execução; o diagnóstico técnico não se aplica a esta "
+            "sessão."
+        )
 
     m = resposta.metadados
     a = resposta.avaliacao_qualidade

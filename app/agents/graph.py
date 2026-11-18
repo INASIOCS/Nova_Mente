@@ -29,7 +29,7 @@ from app.agents.fidelity import (
     combinar_scores,
     verificar_fidelidade,
 )
-from app.agents.llm import ErroLLM, get_cliente_llm
+from app.agents.llm import ErroLLM, ErroQuota, get_cliente_llm
 from app.core.config import get_settings
 from app.rag.retriever import ContextoRecuperado, recuperar_contexto
 
@@ -90,6 +90,11 @@ Monte o plano didático."""
     try:
         plano = cliente.gerar_json(prompts.ROTEADOR_SISTEMA, prompt)
         trace.append(f"roteador: plano gerado ({cliente.caminho})")
+    except ErroQuota:
+        # Cota esgotada: seguir adiante só gastaria o saldo restante em
+        # chamadas que falhariam igual. Aborta o grafo para a interface
+        # explicar o que houve.
+        raise
     except ErroLLM as exc:
         logger.warning("Roteador falhou, seguindo sem plano: %s", exc)
         plano = {}
@@ -163,6 +168,11 @@ def no_critico(estado: EstadoNovaMente) -> EstadoNovaMente:
     )
     try:
         avaliacao = cliente.gerar_json(prompts.CRITICO_SISTEMA, prompt)
+    except ErroQuota:
+        # Cota esgotada: seguir adiante só gastaria o saldo restante em
+        # chamadas que falhariam igual. Aborta o grafo para a interface
+        # explicar o que houve.
+        raise
     except ErroLLM as exc:
         logger.warning("Crítico falhou, usando apenas o score léxico: %s", exc)
         avaliacao = {

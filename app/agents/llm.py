@@ -19,6 +19,55 @@ class ErroLLM(Exception):
     """Falha na chamada ao modelo de linguagem."""
 
 
+class ErroQuota(ErroLLM):
+    """Cota da API do Gemini esgotada (HTTP 429 / RESOURCE_EXHAUSTED).
+
+    Separada de ErroLLM porque o tratamento é outro: não adianta tentar de
+    novo, nem cair para outro caminho de chamada — toda tentativa, inclusive a
+    que falha, consome o saldo diário. Quem captura decide quando voltar a
+    partir de `segundos`, que vem do próprio `retry_delay` da resposta.
+    """
+
+    def __init__(self, mensagem: str, segundos: int | None = None) -> None:
+        super().__init__(mensagem)
+        self.segundos = segundos
+
+
+# Marcas de uma resposta de cota esgotada, em qualquer um dos caminhos de
+# chamada (LangChain embrulha a exceção do SDK, que embrulha o erro HTTP).
+_MARCAS_DE_QUOTA = (
+    "429",
+    "resource_exhausted",
+    "resourceexhausted",
+    "exceeded your current quota",
+    "quota_metric",
+    "quota exceeded",
+)
+
+# O Gemini devolve o tempo de espera em dois formatos conhecidos.
+_ESPERA_PROTOBUF = re.compile(r"retry_delay\s*\{\s*seconds:\s*(\d+)", re.IGNORECASE)
+_ESPERA_TEXTO = re.compile(r"retry in\s+([\d.]+)\s*s", re.IGNORECASE)
+
+
+def _erro_de_quota(exc: Exception) -> ErroQuota | None:
+    """Reconhece um 429 de cota e extrai o tempo de espera, se houver."""
+    texto = str(exc)
+    if not any(marca in texto.lower() for marca in _MARCAS_DE_QUOTA):
+        return None
+
+    segundos: int | None = None
+    for padrao in (_ESPERA_PROTOBUF, _ESPERA_TEXTO):
+        achado = padrao.search(texto)
+        if achado:
+            try:
+                segundos = int(float(achado.group(1)))
+            except ValueError:
+                segundos = None
+            break
+
+    return ErroQuota("Cota da API do Gemini esgotada.", segundos)
+
+
 def _texto_da_resposta(resposta: object) -> str:
     """Extrai o texto de uma resposta do LangChain.
 
@@ -151,6 +200,11 @@ class ClienteGemini:
                 )
                 return _texto_da_resposta(resposta)
             except Exception as exc:
+                quota = _erro_de_quota(exc)
+                if quota is not None:
+                    # Não tentar o SDK direto: a segunda chamada falharia pelo
+                    # mesmo motivo e consumiria mais saldo diário.
+                    raise quota from exc
                 logger.warning("Falha via LangChain, tentando SDK direto: %s", exc)
                 try:
                     import google.generativeai as genai
@@ -174,6 +228,9 @@ class ClienteGemini:
             )
             return resposta.text or ""
         except Exception as exc:
+            quota = _erro_de_quota(exc)
+            if quota is not None:
+                raise quota from exc
             raise ErroLLM(f"Falha ao chamar o Gemini: {exc}") from exc
 
     def gerar_json(self, prompt_sistema: str, prompt_usuario: str) -> dict:
