@@ -2,9 +2,14 @@
 
 Entregável 2 de 4 do No Country: *"Um link do YouTube com a demo do projeto."*
 
-**Duração alvo:** 4 a 5 minutos
+**Duração alvo:** cerca de 5 minutos e 40
 **Formato:** gravação de tela com narração
 **Idioma:** português do Brasil
+
+> Atualizado em 17/11/2026, depois que a integração com o OCI entrou em
+> operação. Se precisar encurtar para 4:30, o corte menos custoso é o bloco da
+> apresentação `.pptx` — não o da Oracle Cloud, que é requisito obrigatório do
+> desafio.
 
 ---
 
@@ -16,23 +21,43 @@ Entregável 2 de 4 do No Country: *"Um link do YouTube com a demo do projeto."*
 - Aba 2 — o repositório no GitHub: https://github.com/INASIOCS/Nova_Mente
 - Aba 3 — `docs/arquitetura.md` aberto no diagrama Mermaid
 - Aba 4 — um arquivo de `examples/` aberto (o JSON do cenário 1)
+- Aba 5 — o console da OCI no balde `novamente-conteudos-educativos`, já na
+  lista de **Objetos**
+- Um terminal, com o diretório do projeto aberto, para o `verificar_oci.py`
 
-**2. Cuidado com a cota do Gemini.** O free tier dá ~20 gerações por dia e cada
-execução consome 3 chamadas. **Faça no máximo UMA geração ao vivo no vídeo.**
-Para o resto, mostre os resultados já salvos em `examples/`. Se quiser testar o
-roteiro antes, ative o modo econômico no `.env`:
+**2. A cota do Gemini tem DOIS limites, e o segundo é o que estraga gravação.**
+São 20 gerações por dia **e 5 por minuto**. Uma execução completa dispara 3
+chamadas em sequência, 5 se houver revisão — ou seja, **uma única geração pode
+estourar o limite por minuto sozinha**, e o erro aparece na tela no meio do
+vídeo. Pior: **tentativa que falha também consome o saldo diário**, então
+repetir o comando na hora do nervosismo queima a cota do dia inteiro.
+
+Regras práticas:
+
+- **No máximo UMA geração ao vivo** no vídeo inteiro.
+- Se der erro 429, **não repita na hora**. Espere um minuto, respire, e corte
+  esse trecho na edição.
+- Teste o roteiro antes com o modo econômico, que reduz para 2 chamadas:
 
 ```ini
 AGENTE_ROTEADOR_ATIVO=false
 MAX_REVISOES=0
 ```
 
-**3. Antes de começar, gere UMA vez** o cenário Iniciante + Flashcards na
-interface, para que o resultado já esteja na tela quando você começar a gravar.
-Assim você evita 45 segundos de silêncio esperando o pipeline.
+**3. Gere o material de apoio com antecedência, não em cima da hora.** Antes de
+gravar, rode UMA vez o cenário Iniciante + Flashcards na interface, para que o
+resultado já esteja na tela quando a gravação começar — evita 45 segundos de
+silêncio. Faça isso com folga: se falhar, você precisa de um minuto de espera.
 
-**4. Esconda a chave de API.** Não abra o arquivo `.env` em nenhum momento da
-gravação.
+**4. Esconda credenciais e dados pessoais.** Não abra o `.env`, o
+`~/.oci/config` nem o arquivo `.pem` em momento algum. No console da OCI, o
+canto superior direito mostra seu e-mail — vale esconder ou recortar na edição.
+
+**5. Se for mostrar persistência na nuvem, gere o material no dia da gravação.**
+Os exemplos salvos em `examples/` foram gerados antes da integração com o OCI
+entrar no ar e trazem `"status_upload": "local"`. Narrar "está salvo na Oracle
+Cloud" apontando para um desses arquivos seria impreciso, e um avaliador técnico
+percebe. Veja o bloco da Oracle Cloud mais abaixo.
 
 ---
 
@@ -185,20 +210,62 @@ score é limitado, não importa o que o modelo diga. O resultado final aqui foi
 
 ---
 
-### [4:20 – 4:50] Saída estruturada, nuvem e exportação
+### [4:20 – 4:40] Saída estruturada
 
-> **Tela:** aba "JSON", depois aba "Exportar".
+> **Tela:** aba "JSON".
 
 **Fala:**
 
 "A saída é um JSON estruturado, no contrato exato que o desafio pediu, com os
 metadados de aprendizado e a avaliação de qualidade. Isso permite integrar com
-qualquer sistema externo.
+qualquer sistema externo."
 
-O documento original e o pacote gerado são persistidos no Object Storage da
-Oracle Cloud, na camada Always Free.
+> **Ação:** role até o bloco `armazenamento_oci` e deixe visível o
+> `"status_upload": "concluido"`.
 
-E o material pode ser exportado como uma apresentação de aula pronta em
+---
+
+### [4:40 – 5:05] Persistência real na Oracle Cloud
+
+> **Tela:** o terminal, depois o console da OCI.
+
+**Fala:**
+
+"E isso não fica só na minha máquina. Cada execução grava dois objetos no Object
+Storage da Oracle, na camada Always Free: o documento técnico original, para
+rastreabilidade, e o pacote educacional gerado."
+
+> **Ação 1:** no terminal, rode `python scripts/verificar_oci.py`. Ele leva
+> poucos segundos e imprime a cadeia inteira em `[ok]`: configuração,
+> credencial, namespace, balde, escrita e leitura.
+
+**Fala:**
+
+"Deixamos um diagnóstico no repositório que confere a cadeia inteira — a
+credencial, o balde, e uma escrita e leitura de verdade. Qualquer pessoa da
+equipe reproduz a configuração com um comando."
+
+> **Ação 2:** passe para o console da OCI, na lista de objetos do balde, e mostre
+> as pastas `originais/` e `conteudos/` com os arquivos lá dentro.
+
+**Fala:**
+
+"E aqui está, no console da Oracle: o documento de origem e o material gerado.
+
+Um detalhe de projeto que vale citar: se a credencial da nuvem falhar, o sistema
+não quebra e também não mente. Ele cai para a persistência local e devolve o
+status 'local' em vez de 'concluido', com um aviso na interface. A degradação
+fica visível."
+
+---
+
+### [5:05 – 5:25] Exportação
+
+> **Tela:** aba "Exportar".
+
+**Fala:**
+
+"E o material pode ser exportado como uma apresentação de aula pronta em
 PowerPoint, em PDF didático, em Markdown, ou em CSV para importar direto no
 Anki."
 
@@ -214,7 +281,7 @@ ancoragem na fonte. É material que o professor leva direto para a sala."
 
 ---
 
-### [4:50 – 5:00] Fechamento
+### [5:25 – 5:40] Fechamento
 
 > **Tela:** o repositório no GitHub.
 
@@ -229,20 +296,33 @@ Obrigado!"
 
 ## ⚠️ Atenção no trecho da Oracle Cloud
 
-No momento da gravação, verifique em que estado está a integração com o OCI:
+**Situação em 17/11/2026:** a integração está no ar. O balde
+`novamente-conteudos-educativos` existe na região de São Paulo, a credencial
+funciona e já há objetos reais gravados e lidos de volta. O `.env` está com
+`STORAGE_BACKEND=oci`, então qualquer execução nova grava na nuvem.
 
-**Se o bucket já estiver configurado e funcionando**, mostre na tela a aba
-"Exportar" com o bloco `armazenamento_oci` trazendo `"status_upload":
-"concluido"`, e narre como está no roteiro.
+**O cuidado que resta é com o material antigo.** Os arquivos de `examples/`
+foram gerados em 15/11, quando o backend ainda era local, e trazem
+`"status_upload": "local"`. Se você mostrar um desses na tela enquanto narra a
+persistência na nuvem, a imagem contradiz a fala — e é exatamente o tipo de
+detalhe que um avaliador técnico nota.
 
-**Se ainda não estiver**, não afirme que está rodando na nuvem. Troque a fala
-por algo honesto como:
+Então, para o bloco da Oracle Cloud, use **uma destas duas fontes**:
 
-> "A camada de persistência está implementada para o Object Storage da Oracle na
-> camada Always Free, com a integração pronta no código, e estamos finalizando a
-> configuração do bucket."
+1. O JSON da geração feita no dia da gravação, que já virá com
+   `"status_upload": "concluido"`; ou
+2. O console da OCI, mostrando os objetos no balde — que vale por si só,
+   independentemente de qual execução os criou.
 
-Um avaliador técnico vai conferir. É melhor ser preciso do que prometer.
+Antes de gravar, confirme com um comando que não gasta cota nenhuma:
+
+```bash
+python scripts/verificar_oci.py
+```
+
+Se ele terminar com `[ok]` em todas as etapas, pode narrar o trecho com
+segurança. Se falhar, não afirme que está na nuvem — descreva a arquitetura e
+siga em frente.
 
 ---
 
