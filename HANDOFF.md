@@ -1,12 +1,12 @@
 # Project Handoff — NovaMente
 
-**Last Updated:** 2026-11-15 (horário local do sistema, Windows)
-**Status:** ACTIVE — MVP funcional, testado e publicado no GitHub; faltam deploy e anotações
+**Last Updated:** 2026-11-17 ~21:15 (horário local do sistema, Windows)
+**Status:** ACTIVE — MVP funcional e testado; **integração com o OCI Object Storage executada e verificada de verdade**; falta uma execução do pipeline completo gravando no balde (bloqueada hoje pela cota diária do Gemini)
 **Project:** NovaMente — Sistema Inteligente de Adaptação e Geração de Conteúdo Educacional
 **Contexto:** Hackathon ONE G10 — Projeto 1 — Oracle Next Education & Alura
 **Project Root:** `C:\Users\inasio\OneDrive\Área de Trabalho\Projeto_Nova_Mente`
 **Repositório:** https://github.com/INASIOCS/Nova_Mente (público, branch `main`)
-**Prazo de entrega:** segunda-feira, 16/11/2026
+**Prazo registrado:** segunda-feira, 16/11/2026 — **já passou** (ver seção 13)
 
 ---
 
@@ -29,6 +29,14 @@ O sistema está **implementado e funcionando de ponta a ponta**. Quatro execuç�
 reais com a API do Gemini produziram material didático correto e tecnicamente
 fiel, versionado em `examples/`.
 
+**Novidade desta sessão (17/11):** o OCI saiu do papel. Credencial criada, balde
+criado, e o backend `oci` **gravou e leu objetos reais** no
+`novamente-conteudos-educativos`. O `.env` já está com `STORAGE_BACKEND=oci`.
+
+O que ainda falta para o item 6 ficar 100%: **uma execução do pipeline completo**
+(com LLM) devolvendo `status_upload: "concluido"` dentro da resposta. Isso não é
+limitação do OCI — é a cota diária do Gemini, esgotada hoje.
+
 ### Evidence Summary
 
 - **IMPLEMENTED:** pipeline completo — ingestão (PDF/MD/texto), RAG (chunking,
@@ -37,9 +45,23 @@ fiel, versionado em `examples/`.
   storage abstraído (local + OCI), FastAPI, Streamlit com quiz interativo,
   exportação em apresentação .pptx, Markdown, PDF e CSV-Anki, Docker e
   configuração Railway.
-- **TESTED:** 33 testes automatizados passando (`python -m pytest tests -q`);
-  `compileall` sem erros; 4 cenários de demonstração executados de ponta a ponta
-  contra a API real.
+- **TESTED (17/11):** `.venv\Scripts\python.exe -m pytest tests -q` →
+  **34 passed**, já com `STORAGE_BACKEND=oci` no `.env`. Nenhum teste consome
+  quota da API nem exige credencial do OCI.
+- **VERIFIED (17/11) — OCI Object Storage real:** `scripts/verificar_oci.py`
+  percorreu a cadeia inteira com sucesso: config → credencial aceita →
+  namespace `gr6m1uqnjub1` → balde `novamente-conteudos-educativos`
+  (Standard, NoPublicAccess, compartimento raiz `InasioOCI`) → escrita, leitura
+  idêntica e remoção de um objeto de teste. Em seguida, a camada de storage do
+  projeto (`criar_storage()` + `enviar_bytes`/`enviar_json`) gravou **dois
+  artefatos reais** que continuam no balde:
+  `originais/oci-vcn-arquitetura-de-redes-014ee9.md` (6.246 bytes) e
+  `conteudos/oci-vcn-arquitetura-de-redes-iniciante-flashcards-1c1d52.json`
+  (12.746 bytes), ambos com `status_upload: "concluido"`, e o JSON foi lido de
+  volta íntegro.
+- **VERIFIED (17/11):** `GET /saude?profundo=true` →
+  `storage_backend_ativo: "oci"`, `bucket_acessivel: true`,
+  `aviso_storage: null`.
 - **VERIFIED (15/11):** os 4 decks dos cenários de `examples/` foram
   renderizados em PNG pelo PowerPoint e conferidos slide a slide, junto com
   um deck de casos-limite (título de três linhas, corpo longo, comando
@@ -47,17 +69,22 @@ fiel, versionado em `examples/`.
 - **VERIFIED:** material do cenário 1 inspecionado manualmente — tecnicamente
   correto e adequado ao perfil iniciante. Chave do Gemini validada. Modelos
   disponíveis confirmados por `list_models`. `.env` confirmado fora do Git.
+- **VERIFIED (17/11):** repositório limpo e sincronizado —
+  `git status` sem alterações, `main` alinhada com `origin/main` em `5b8db88`.
 - **APPROVED:** as 6 decisões da seção 4 foram escolhidas explicitamente pelo
   usuário.
 
 ### O que NÃO está feito
 
-- Deploy no Railway (bloqueado — ver Workflow correspondente).
-- Anotações no No Country (bloqueado — mesmo motivo).
-- Integração OCI Object Storage **nunca foi executada contra o serviço real**:
-  o código existe e está completo, mas a senha do OCI ainda não foi redefinida.
-- Cenário 5 de demonstração (ingestão de PDF → Tutorial) não gerado: cota diária
-  da API do Gemini esgotada.
+- **Execução do pipeline completo gravando no OCI.** A camada de storage está
+  verificada, mas nenhuma resposta gerada pelo pipeline carregou ainda
+  `status_upload: "concluido"`. Bloqueado hoje pela cota diária do Gemini
+  (ver Known Issues); é um comando só quando a cota voltar.
+- Deploy no Railway (pendente — a `GOOGLE_API_KEY` precisa ser inserida pelo
+  usuário).
+- Anotações no No Country (pendente — exige sessão autenticada do usuário).
+- Cenário 5 de demonstração (ingestão de PDF → Tutorial) ainda não gerado:
+  três tentativas em 17/11 bateram no limite por minuto e depois no diário.
 
 ---
 
@@ -68,64 +95,81 @@ fiel, versionado em `examples/`.
 
 Todo o pipeline está implementado, testado e commitado. Nada pendente.
 
-**Validação executada**
-- `python -m pytest tests -q` → 29 passed.
-- `python scripts/gerar_exemplos.py` → 4 de 5 cenários concluídos.
+**Validação executada (17/11)**
+- `.venv\Scripts\python.exe -m pytest tests -q` → 33 passed.
 
 ---
 
 ### Workflow: Integração OCI Object Storage (OBRIGATÓRIO)
-**Status:** BLOCKED
+**Status:** IN PROGRESS — infraestrutura e storage VERIFICADOS; falta a execução
+do pipeline completo
 
-**Blocker**
-- O usuário recuperou o acesso ao OCI mas **ainda não redefiniu a senha**. Sem o
-  console não há como criar o bucket nem gerar o par de chaves de API.
+**Executado e verificado em 17/11**
+- Balde `novamente-conteudos-educativos` criado na região `sa-saopaulo-1`
+  (Brasil Leste / São Paulo), compartimento raiz `InasioOCI`, escopo Namespace,
+  camada **Standard**, privado, sem auto-tiering, sem versionamento, chave de
+  criptografia gerenciada pela Oracle — tudo dentro da Always Free.
+- Namespace do tenancy: `gr6m1uqnjub1` (fixado em `OCI_NAMESPACE` no `.env`
+  para poupar uma chamada por execução).
+- Chave de API registrada no usuário; privada instalada em
+  `C:\Users\inasio\.oci\oci_api_key.pem`, **fora** da pasta sincronizada do
+  projeto. `~/.oci/config`, perfil `DEFAULT`, aponta para ela.
+- `.env`: `STORAGE_BACKEND=oci`.
+- Dois objetos reais gravados e conferidos no balde (ver Evidence Summary).
 
-**Completed**
+**Completed (código, de sessões anteriores)**
 - `app/storage/oci_storage.py` implementado: autenticação por arquivo de
-  configuração ou Resource Principal, `put_object`, criação de bucket, montagem
-  da URI e tratamento de falha sem derrubar o pipeline.
+  configuração (`~/.oci/config`) com fallback para Resource Principal,
+  `enviar_bytes` (`put_object`), `garantir_bucket`, montagem da URI pública
+  (`https://objectstorage.<regiao>.oraclecloud.com/n/<ns>/b/<bucket>/o/<obj>`)
+  e tratamento de falha sem derrubar o pipeline.
 - `app/storage/factory.py` seleciona o backend por `STORAGE_BACKEND` e devolve
   um aviso explícito quando degrada para o local.
+- `.env` **já traz os valores certos** de `OCI_BUCKET_NAME`
+  (`novamente-conteudos-educativos`), `OCI_REGION` (`sa-saopaulo-1` — a mesma
+  região do console aberto), `OCI_CONFIG_FILE` (`~/.oci/config`) e
+  `OCI_PROFILE` (`DEFAULT`). `OCI_NAMESPACE` está **vazio de propósito** — o
+  código o descobre por `get_namespace()`.
+- SDK `oci 2.191.0` instalado no `.venv` (**confirmado em 17/11**).
 
 **Pending**
-1. Redefinir a senha do OCI e entrar no console.
-2. Criar o bucket `novamente-conteudos-educativos` na camada Always Free.
-3. Gerar o par de chaves de API e configurar `~/.oci/config`.
-4. No `.env`, definir `STORAGE_BACKEND=oci` e ajustar `OCI_NAMESPACE`,
-   `OCI_REGION` e `OCI_BUCKET_NAME`.
-5. Validar com `GET /saude` e uma execução real.
+1. Com a cota do Gemini renovada, rodar o pipeline completo uma vez:
+   `.venv\Scripts\python.exe scripts/gerar_exemplos.py 5` (gera também o cenário
+   5, que falta). Conferir `armazenamento_oci.status_upload == "concluido"` no
+   JSON gerado.
+2. Atualizar o item 6 do checklist (seção 6) com essa evidência.
+
+**Dependencies / Blockers**
+- Cota diária do Gemini (ver Known Issues). Nada a ver com o OCI.
 
 **Validation / Success Criteria**
-- `GET /saude` retorna `"storage_backend_ativo": "oci"` e nenhum
-  `aviso_storage`.
-- Uma execução grava os dois objetos (`originais/...` e `conteudos/....json`) e
-  a resposta traz `"status_upload": "concluido"` — hoje retorna `"local"`.
+- `python scripts/verificar_oci.py` termina com exit 0 — **já atendido**.
+- `GET /saude?profundo=true` → `storage_backend_ativo: "oci"`,
+  `bucket_acessivel: true`, sem aviso — **já atendido**.
+- Uma execução do pipeline grava os dois objetos e a resposta traz
+  `"status_upload": "concluido"` — **pendente**.
 
 ---
 
 ### Workflow: Deploy no Railway
-**Status:** BLOCKED
+**Status:** PENDING
 
 **Completed**
 - `Dockerfile` (imagem única, `SERVICE=ui|api`, porta de `$PORT`),
   `entrypoint.sh`, `railway.json` e `.dockerignore` commitados.
 
-**Blocker**
-- O navegador interno do Claude **não está autenticado** no Railway nem no No
-  Country: ele é isolado do Chrome do usuário. Ambas as URLs redirecionaram
-  para a tela de login.
-- Além disso, por regra de segurança o agente **não digita chaves de API em
-  formulários de serviços externos**. A variável `GOOGLE_API_KEY` precisa ser
-  inserida pelo próprio usuário no painel do Railway.
-
 **Pending**
 1. No painel do Railway, criar projeto a partir de `INASIOCS/Nova_Mente`.
-2. Definir variáveis: `GOOGLE_API_KEY` (pelo usuário), `SERVICE=ui`,
+2. Definir variáveis: `GOOGLE_API_KEY` (**pelo usuário**), `SERVICE=ui`,
    `GEMINI_MODEL=gemini-3.5-flash`,
    `GEMINI_EMBEDDING_MODEL=models/gemini-embedding-001`.
 3. Opcional: segundo serviço no mesmo repositório com `SERVICE=api` e
    `healthcheckPath=/saude`.
+
+**Dependencies / Blockers**
+- Sessão autenticada do usuário (o navegador interno do Claude não está logado).
+- Por regra de segurança o agente **não digita chaves de API em formulários de
+  serviços externos** — a `GOOGLE_API_KEY` é inserida pelo usuário.
 
 **Validation / Success Criteria**
 - A URL pública abre a interface Streamlit e gera um material com sucesso.
@@ -133,21 +177,22 @@ Todo o pipeline está implementado, testado e commitado. Nada pendente.
 ---
 
 ### Workflow: Anotações no No Country
-**Status:** BLOCKED
+**Status:** PENDING
 
 - Página: https://talent.nocountry.tech/my-simulation/communication
+- Rascunho pronto e versionado em `docs/anotacoes-nocountry.md`.
 - O usuário autorizou publicar diretamente, assinando como ele: *"Você pode
   publicar direto, faça os comentários como eu Inasio."*
-- Bloqueado pelo mesmo motivo do Railway: sessão não disponível no navegador
-  interno.
+- Depende da sessão autenticada do usuário, pelo mesmo motivo do Railway.
 
 ---
 
 ### Workflow: Cenário 5 de demonstração
 **Status:** PENDING
 
-- Falhou com `429` — cota diária do free tier esgotada (~20 gerações/dia).
-- Com a cota renovada: `python scripts/gerar_exemplos.py 5`.
+- Falhou com `429` em 15/11 — cota diária do free tier esgotada
+  (~20 gerações/dia). A cota já deve ter renovado.
+- Comando: `.venv\Scripts\python.exe scripts/gerar_exemplos.py 5`.
 - **Não é bloqueante**: o checklist exige 3 exemplos e há 4 versionados.
 
 ---
@@ -176,6 +221,7 @@ Todo o pipeline está implementado, testado e commitado. Nada pendente.
 - **[MUST PRESERVE] Degradação visível.** Quando um backend cai para o fallback,
   isso aparece no diagnóstico e na interface. O fallback de storage retorna
   `status_upload: "local"`, nunca `"concluido"`.
+- **[MUST PRESERVE] `_texto_da_resposta()` em `app/agents/llm.py`.** Ver seção 6.
 
 ---
 
@@ -186,7 +232,7 @@ Todo o pipeline está implementado, testado e commitado. Nada pendente.
   subir para o GIT"* — **FEITO**.
 - *"https://talent.nocountry.tech/my-simulation/communication que é a pagina onde
   devemos ir colocando lá todas as anotações"* — **PENDENTE**.
-- Prazo: *"Até Segunda-feira 16/11/2026"*.
+- Prazo registrado: *"Até Segunda-feira 16/11/2026"* — ver seção 13.
 - *"Sim, acredito que sim"* — outros integrantes do Grupo 10 também devem
   commitar; manter o histórico legível e por camada.
 
@@ -239,22 +285,56 @@ Todo o pipeline está implementado, testado e commitado. Nada pendente.
 | 3 | Orquestração com LLM | ✅ LangGraph, 4 agentes |
 | 4 | Mesmo conteúdo para ≥2 perfis e ≥2 formatos | ✅ cenários 1, 2 e 3 (mesmo doc de VCN) |
 | 5 | JSON estruturado + interface ou API REST | ✅ Pydantic + Streamlit **e** FastAPI |
-| 6 | OCI Object Storage (Always Free) | ⚠️ implementado, **nunca executado de verdade** |
+| 6 | OCI Object Storage (Always Free) | 🟡 balde criado e objetos reais gravados/lidos em 17/11; falta uma resposta do pipeline com `status_upload: "concluido"` |
 | 7 | ≥3 exemplos de execução | ✅ 4 versionados em `examples/` |
 | 8 | Documentação com diagrama de arquitetura | ✅ README + `docs/arquitetura.md` (Mermaid) |
 
-**O item 6 é o único risco real da entrega.**
+**O item 6 deixou de ser risco de infraestrutura e virou só uma questão de cota:
+o balde responde, a credencial funciona e os objetos estão lá.**
 
-### Finding: Cota do free tier do Gemini é o gargalo operacional
-- **Finding:** o free tier permite ~**20 requisições de geração por dia, por
-  modelo**. Cada execução consome 3 chamadas (Roteador, Redator, Crítico) e 5 se
-  houver rodada de revisão.
-- **Evidence:** erro `429` no cenário 5, com `quota_value: 20` e
-  `retry_delay: 14999s` (~4h10m a partir de ~00:50 de 15/11/2026).
-- **Impact:** cerca de **6 demonstrações ao vivo por dia**. Na apresentação,
-  prefira os exemplos já versionados; para gerar ao vivo, use o modo econômico
-  (`AGENTE_ROTEADOR_ATIVO=false`, `MAX_REVISOES=0` → 2 chamadas).
+### Finding: A aplicação nunca cria o bucket sozinha — por decisão
+- **Finding:** `OCIObjectStorage.garantir_bucket(compartment_id)` não é chamado
+  por nenhum caminho da aplicação. Desde 17/11 existe **um** chamador:
+  `scripts/verificar_oci.py --criar-bucket`, explícito e fora do pipeline.
+- **Impact:** se o bucket sumir, o upload falha com `status_upload: "falhou"`;
+  recrie pelo console ou pelo script. Não acople criação de recurso ao pipeline.
+- **Confidence:** CONFIRMED (17/11)
+
+### Finding: Estado local do OCI (17/11, após o setup)
+- `~/.oci/config` existe, perfil `DEFAULT`, apontando para
+  `C:/Users/inasio/.oci/oci_api_key.pem`.
+- O **OCI CLI não está instalado** e não é necessário — o `config` foi escrito à
+  mão a partir do *Configuration file preview* do console.
+- SDK Python `oci 2.191.0` no `.venv`.
+- `STORAGE_BACKEND=oci` e `OCI_NAMESPACE=gr6m1uqnjub1` no `.env`.
 - **Confidence:** CONFIRMED
+
+### Finding: A chave privada da API só existe no instante da criação
+- **Finding:** no fluxo *Gerar par de chaves de API*, o console oferece o
+  download da privada **uma única vez**. Fechou a janela, a chave registrada
+  fica inútil: só resta excluí-la e criar outra. Isso custou duas tentativas
+  em 17/11.
+- **Impact:** prefira *Colar chave pública* com um par gerado localmente — não
+  há download para perder, e o fingerprint é conhecido de antemão.
+- **Confidence:** CONFIRMED (observado duas vezes)
+
+### Finding: O free tier do Gemini tem DOIS limites, não um
+- **Finding:** além do limite diário (`GenerateRequestsPerDayPerProjectPerModel`,
+  **20/dia por modelo**), existe um limite por minuto
+  (`GenerateRequestsPerMinutePerProjectPerModel`, **5/min**). Uma execução
+  completa dispara 3 chamadas em sequência (Roteador, Redator, Crítico) e 5 se
+  houver revisão — ou seja, **uma única execução pode estourar o limite por
+  minuto sozinha**.
+- **Evidence:** em 17/11, três tentativas do cenário 5: as duas primeiras caíram
+  em `quota_value: 5` com `retry_delay` de 23s e 30s; a terceira, já com a janela
+  aberta, caiu em `quota_value: 20` (diário) com `retry_delay: 28429s` (~7h54m).
+- **Impact crítico:** **tentativas que falham também consomem o saldo diário.**
+  Repetir um comando que deu 429 por minuto queima quota diária à toa. Espere
+  pelo menos 60s entre tentativas, e prefira o modo econômico
+  (`AGENTE_ROTEADOR_ATIVO=false`, `MAX_REVISOES=0` → 2 chamadas).
+- **Na apresentação:** use os exemplos versionados em `examples/`. Gerar ao vivo
+  é arriscado por causa do limite por minuto.
+- **Confidence:** CONFIRMED (17/11)
 
 ### Finding: Nem todo modelo Gemini está disponível para esta chave
 - **Finding:** `gemini-2.5-flash` responde *"no longer available to new users"*;
@@ -262,9 +342,8 @@ Todo o pipeline está implementado, testado e commitado. Nada pendente.
   **`gemini-3.5-flash` funciona** e é o modelo em uso. O embedding
   `text-embedding-004` não existe mais; **`gemini-embedding-001`** funciona
   (3072 dimensões).
-- **Impact:** não troque o modelo sem testar. O erro de cota reporta
-  `gemini-3.6-flash`, sugerindo que `gemini-3.5-flash` é roteado internamente.
-- **Confidence:** CONFIRMED (testado nesta sessão)
+- **Impact:** não troque o modelo sem testar.
+- **Confidence:** CONFIRMED
 
 ### Finding: No LangChain 1.x, `AIMessage.content` pode ser uma LISTA
 - **Finding:** `response.content` vem como `[{"type": "text", "text": "..."}]`.
@@ -280,22 +359,17 @@ Todo o pipeline está implementado, testado e commitado. Nada pendente.
 - **Impact:** `max_output_tokens` está em 16384. Não reduzir.
 - **Confidence:** CONFIRMED (via `usage_metadata`)
 
-### Finding: `python` funciona agora nesta máquina
-- Python 3.13.17; `python`, `py` e `python3` todos funcionam. O venv do projeto
-  está em `.venv`.
-- **Confidence:** CONFIRMED
-
-### Finding: `gh` existe mas não está no PATH do Bash
-- `gh` 2.104.0 em `C:\Program Files\GitHub CLI\gh.exe`, autenticado como
-  **INASIOCS** com escopos `gist, read:org, repo, workflow`. Invoque pelo
-  caminho completo no Bash.
-- **Confidence:** CONFIRMED
-
-### Finding: O navegador interno do Claude é isolado do Chrome do usuário
+### Finding: O navegador interno do Claude é isolado do navegador do usuário
 - Railway e No Country redirecionaram para login no navegador interno, embora o
-  usuário esteja logado no próprio Chrome.
-- **Impact:** esses dois passos exigem o Chrome do usuário (Claude in Chrome) ou
-  login/importação de cookies no painel interno.
+  usuário esteja logado no próprio navegador.
+- **Impact:** console da OCI, Railway e No Country exigem o navegador do usuário
+  (que é o **Edge**) ou login/importação de cookies no painel interno.
+- **Confidence:** CONFIRMED
+
+### Finding: Ferramentas locais
+- Python 3.13.17; `python`, `py` e `python3` funcionam; venv em `.venv`.
+- `gh` 2.104.0 em `C:\Program Files\GitHub CLI\gh.exe`, autenticado como
+  **INASIOCS** — **fora do PATH do Bash**, invoque pelo caminho completo.
 - **Confidence:** CONFIRMED
 
 ---
@@ -347,10 +421,27 @@ Todo o pipeline está implementado, testado e commitado. Nada pendente.
 - **Evidence:** VERIFIED no rastro do pipeline.
 - **Why it matters:** prova que a aresta condicional do LangGraph funciona.
 
+### Correção: `gerar_exemplos.py` apagava o RESUMO ao rodar um subconjunto
+- **Result:** rodar `gerar_exemplos.py 5` sobrescrevia `examples/RESUMO.json`
+  com apenas aquele cenário — em 17/11 isso apagou o registro dos 4 cenários
+  bons (restaurado com `git checkout`).
+- **Evidence:** TESTED — agora o script mescla por `id`; um `ok` novo substitui
+  o anterior, e um `erro` só ocupa vaga vazia, para o resumo não contradizer os
+  arquivos presentes. Verificado com `gerar_exemplos.py 99` (nenhuma chamada à
+  LLM): os 5 registros permanecem intactos.
+- **Why it matters:** o próximo passo do projeto é exatamente rodar o cenário 5
+  sozinho.
+
 ### Teste que revelou defeito real na métrica de fidelidade
 - **Result:** as chaves do JSON eram contadas como vocabulário técnico,
   deprimindo a cobertura. Corrigido para percorrer apenas os valores.
 - **Evidence:** TESTED — `test_material_ancorado_tem_score_alto`.
+
+### Verificação visual dos decks por renderização em PNG
+- **Result:** os 4 decks + um deck de casos-limite conferidos slide a slide.
+- **Evidence:** VERIFIED (15/11).
+- **Why it matters:** `app/export/slides.py` monta o layout por código; só a
+  renderização revela estouro de caixa.
 
 ---
 
@@ -370,14 +461,21 @@ Todo o pipeline está implementado, testado e commitado. Nada pendente.
 - **Result / Error:** `404 not found for API version v1beta`.
 - **Replacement:** `models/gemini-embedding-001` (3072 dimensões).
 
+### Abrir Railway / No Country pelo navegador interno do Claude
+- **Result / Error:** redirecionamento para a tela de login.
+- **Why:** o navegador interno é isolado da sessão do usuário.
+- **Replacement:** o usuário conduz no próprio navegador (Edge), ou
+  login/importação de cookies no painel interno.
+- **Do not repeat unless:** a sessão tiver sido estabelecida no painel interno.
+
 ### Leitura do PDF pela ferramenta Read
 - **Result / Error:** `pdftoppm is not installed`.
 - **Replacement:** texto extraído por script Node; conteúdo preservado aqui.
   Hoje há `pypdf` no venv, então `app/ingestion/loader.py` resolve.
 
-### Heredoc `<<'EOF'` no Bash para escrever JavaScript
+### Heredoc `<<'EOF'` no Bash para escrever arquivos com barras invertidas
 - **Result / Error:** barras invertidas duplas reduzidas a simples.
-- **Replacement:** escrever arquivos de código com a ferramenta `Write`.
+- **Replacement:** escrever arquivos com a ferramenta `Write`.
 
 ### Caractere `→` em `print()` no console Windows
 - **Result / Error:** `UnicodeEncodeError` com o codec cp1252.
@@ -395,18 +493,25 @@ Todo o pipeline está implementado, testado e commitado. Nada pendente.
 | `app/agents/fidelity.py` | created | Verificação léxica anti-alucinação com veto. |
 | `app/agents/prompts.py` | created | Role prompting + few-shot por formato. |
 | `app/rag/` | created | chunking · embeddings · vector_store · retriever. |
-| `app/storage/oci_storage.py` | created | **Nunca executado contra o OCI real.** |
+| `app/storage/oci_storage.py` | verified | Exercitado contra o OCI real em 17/11: escrita, leitura e URI corretas. |
+| `scripts/verificar_oci.py` | created | Diagnóstico da cadeia OCI; para no primeiro elo quebrado. `--criar-bucket` opcional. |
+| `app/storage/factory.py` | created | Escolhe o backend por `STORAGE_BACKEND`; avisa ao degradar. |
 | `app/pipeline.py` | created | Orquestração de ponta a ponta + diagnóstico. |
-| `app/api/main.py` | created | FastAPI. `GET /saude` mostra os backends ativos. |
+| `app/api/main.py` | modified | FastAPI. `GET /saude` mostra os backends; `?profundo=true` também checa o bucket. |
 | `ui/app.py` | created | Streamlit com identidade institucional; aba de quiz interativo. |
 | `app/export/slides.py` | created | Deck .pptx montado por código, sem template externo. |
 | `.streamlit/config.toml` | created | Tema (navy/ouro) alinhado ao deck. |
 | `.claude/launch.json` | created | Sobe a interface (8501) e a API (8000) localmente. |
+| `scripts/gerar_exemplos.py` | created | Gera os cenários de demonstração (consome quota). |
 | `scripts/gerar_pdf_documentacao.py` | created | Refaz `docs/NovaMente_Documentacao.pdf`. |
 | `examples/` | created | 4 cenários reais (JSON + Markdown) + `RESUMO.json`. |
 | `docs/fontes/` | created | 3 documentos da OCI: `.md`, `.txt` e `.pdf`. |
 | `docs/arquitetura.md` | created | Diagramas Mermaid e decisões de projeto. |
-| `.env` | created | **Não versionado.** Contém a `GOOGLE_API_KEY`. |
+| `docs/anotacoes-nocountry.md` | created | Rascunho das anotações a publicar no No Country. |
+| `docs/ROTEIRO_VIDEO_DEMO.md` | created | Roteiro do vídeo de demonstração. |
+| `docs/exemplos/NovaMente_Apresentacao_Exemplo.pptx` | created | Deck de exemplo gerado pelo sistema. |
+| `README.md` | created | Setup do OCI documentado a partir da linha ~335. |
+| `.env` | modified pending | **Não versionado.** `STORAGE_BACKEND=local` → virar `oci`. |
 | `Dockerfile`, `entrypoint.sh`, `railway.json` | created | Deploy; `SERVICE=ui\|api`. |
 | `tests/` | created | 33 testes, sem consumo de quota. |
 
@@ -417,12 +522,14 @@ Todo o pipeline está implementado, testado e commitado. Nada pendente.
 ### Environment
 - **OS:** Windows 11 Pro 10.0.26200 · PowerShell + Bash
 - **Python:** 3.13.17 · venv do projeto em `.venv`
-- **Node:** v22.20.0 (usado só para extrair o PDF do briefing)
-- **Git:** 2.46.0 · GCM · remoto `origin` configurado
+- **Navegador do usuário:** **Microsoft Edge** (console da OCI aberto nele)
+- **Git:** 2.46.0 · GCM · `main` sincronizada com `origin/main` em `5b8db88`
 - **gh:** 2.104.0 em `C:\Program Files\GitHub CLI\gh.exe` (fora do PATH do Bash)
+- **OCI CLI:** não instalado · **SDK `oci` 2.191.0 instalado no `.venv`**
 - **Docker:** não instalado localmente (a imagem é construída pelo Railway)
 - **Pasta dentro do OneDrive:** `.venv/`, `chroma_db/` e `storage_local/` estão
-  no `.gitignore` para não sincronizar.
+  no `.gitignore` para não sincronizar. **Guarde a chave privada `.pem` do OCI
+  fora da pasta do projeto** (ex.: `%USERPROFILE%\.oci\`).
 
 ### Versões relevantes instaladas
 `fastapi 0.163.0` · `streamlit 1.67.0` · `pydantic 2.14.3` · `langchain 1.5.0` ·
@@ -447,24 +554,38 @@ OCI_CONFIG_FILE · OCI_PROFILE · OCI_NAMESPACE · OCI_BUCKET_NAME · OCI_REGION
 "/c/Program Files/GitHub CLI/gh.exe" repo view INASIOCS/Nova_Mente
 ```
 
+Teste rápido de autenticação do OCI, sem subir a aplicação:
+```text
+.venv\Scripts\python.exe -c "import oci; c=oci.config.from_file(); oci.config.validate_config(c); print(oci.object_storage.ObjectStorageClient(c).get_namespace().data)"
+```
+
 ---
 
 ## 12. Known Issues / Pitfalls
 
-### Issue: Cota diária do Gemini (~20 gerações/dia)
-- **Confidence:** CONFIRMED
-- **Avoid:** gerar vários cenários ao vivo em sequência.
-- **Action:** usar `examples/` na apresentação; modo econômico se precisar gerar.
+### Issue: Item 6 — falta a prova pelo pipeline
+- **Symptoms:** nenhuma resposta gerada carrega ainda
+  `armazenamento_oci.status_upload: "concluido"`. Os exemplos em `examples/`
+  são de 15/11 e trazem `"local"`, o que é historicamente correto.
+- **Cause:** cota diária do Gemini esgotada em 17/11. CONFIRMED. **Não é
+  problema do OCI** — a camada de storage já está verificada.
+- **Action:** rodar `scripts/gerar_exemplos.py 5` quando a cota voltar.
 
-### Issue: Item 6 do checklist não exercitado
-- **Symptoms:** `armazenamento_oci.status_upload` retorna `"local"`.
-- **Cause:** sem credenciais OCI. CONFIRMED.
-- **Action:** é a prioridade número um antes da entrega.
-
-### Issue: A chave do Gemini foi exposta em texto aberto no chat
+### Issue: Cota do Gemini — 5/min e 20/dia
 - **Confidence:** CONFIRMED
-- **Action:** revogar e gerar nova chave no Google AI Studio após a
-  apresentação. Ela está só no `.env` local, que não é versionado.
+- **Avoid:** repetir imediatamente um comando que deu 429; a tentativa falha
+  consome saldo diário.
+- **Action:** esperar ≥60s entre tentativas; modo econômico para gerar ao vivo.
+
+### Issue: Segredos expostos no chat
+- **Confidence:** CONFIRMED
+- **Quais:** a `GOOGLE_API_KEY` (em texto, sessões anteriores) e a **chave
+  privada da API do OCI** (em captura de tela, 17/11).
+- **Current State:** ambas em uso e funcionando; nenhuma está versionada.
+- **Action após a entrega:** gerar nova chave no Google AI Studio e revogar a
+  antiga; no OCI, *Meu perfil → Tokens e chaves*, excluir a chave de impressão
+  digital atual e adicionar outra. Trocar a chave do OCI é barato — basta
+  substituir o `.pem` e o `fingerprint` em `~/.oci/config`.
 
 ### Issue: `google-generativeai` está descontinuado
 - **Symptoms:** `FutureWarning` a cada import (silenciado em `app/__init__.py`).
@@ -483,9 +604,13 @@ OCI_CONFIG_FILE · OCI_PROFILE · OCI_NAMESPACE · OCI_BUCKET_NAME · OCI_REGION
 
 ## 13. Unresolved Questions
 
-- **[NEEDS CONFIRMATION]** Como executar os passos que exigem sessão
-  autenticada (Railway e No Country): usar o Chrome do usuário via Claude in
-  Chrome, fazer login no navegador interno, ou o próprio usuário executa?
+- **[NEEDS CONFIRMATION] O prazo registrado (segunda, 16/11/2026) já passou** —
+  hoje é 17/11/2026. Houve prorrogação? A entrega no No Country foi feita pelo
+  usuário por fora? Isso muda a prioridade entre "fechar o item 6" e "publicar
+  as anotações". Perguntar antes de reordenar o trabalho.
+- **RESOLVIDO (17/11):** quem conduz o console web é o **usuário**, no Edge,
+  enviando capturas e colando os dados; o agente faz a parte local. Funcionou
+  bem para o OCI e é o modelo para o Railway e o No Country.
 - **[NEEDS CONFIRMATION]** Nomes dos demais integrantes do Grupo 10, para
   creditar no README.
 
@@ -494,54 +619,75 @@ OCI_CONFIG_FILE · OCI_PROFILE · OCI_NAMESPACE · OCI_BUCKET_NAME · OCI_REGION
 ## 14. Next Session — Start Here [P0]
 
 ### Immediate Objective
-Fechar o item 6 do checklist: executar a integração real com o OCI Object
-Storage. É o único requisito obrigatório ainda não exercitado.
+Fechar o item 6 com a prova que falta: uma execução do **pipeline completo**
+gravando no OCI, com `status_upload: "concluido"` na resposta.
 
 ### First Action
-1. Redefinir a senha do OCI e entrar no console.
-2. Criar o bucket `novamente-conteudos-educativos` na camada **Always Free**.
-3. Gerar o par de chaves de API e montar `~/.oci/config`.
-4. No `.env`: `STORAGE_BACKEND=oci`, `OCI_NAMESPACE`, `OCI_REGION`.
-5. Validar:
+Confirme primeiro que o ambiente continua de pé (não consome quota):
 
 ```bash
-.venv\Scripts\python.exe -m uvicorn app.api.main:app --reload
+.venv/Scripts/python.exe scripts/verificar_oci.py
 ```
 
-Confirme que `GET /saude` retorna `"storage_backend_ativo": "oci"` sem aviso.
-Depois rode um cenário e verifique `"status_upload": "concluido"`.
+Deve terminar com exit 0. Então rode o cenário que falta, que também exercita a
+ingestão de PDF:
+
+```bash
+.venv/Scripts/python.exe scripts/gerar_exemplos.py 5
+```
+
+**Antes de rodar, leia o Finding sobre as duas cotas do Gemini.** Se vier 429
+com `quota_value: 5`, é o limite por minuto: espere ≥60s. Se vier
+`quota_value: 20`, é o diário: só no dia seguinte — **não insista**, cada
+tentativa falha consome saldo.
+
+Depois confira, no JSON gerado em `examples/`, que
+`resposta.armazenamento_oci.status_upload == "concluido"` e que os objetos
+apareceram no balde.
 
 ### Em seguida
+- Atualizar o item 6 do checklist (seção 6) com essa evidência.
 - Deploy no Railway (a `GOOGLE_API_KEY` deve ser inserida pelo usuário).
-- Publicar as anotações no No Country, assinando como Inasio.
-- Com a cota renovada: `python scripts/gerar_exemplos.py 5`.
+- Publicar as anotações do `docs/anotacoes-nocountry.md` no No Country,
+  assinando como Inasio.
+- Após a entrega: rotacionar as duas credenciais expostas (seção 12).
 
 ### Constraints
 - Preservar as decisões aprovadas da seção 4.
 - Não renomear campos do contrato JSON.
 - Não trocar o modelo Gemini sem testar — ver seção 6.
 - Não reverter `_texto_da_resposta()` em `app/agents/llm.py`.
-- Não criar recursos OCI fora da camada Always Free.
-- Não commitar `.env`.
+- Não criar recursos OCI fora da camada **Always Free**.
+- Não commitar `.env`, o `~/.oci/config` nem a chave privada `.pem`; guardá-los
+  fora da pasta sincronizada do projeto.
+- Não "simular" sucesso de upload: o fallback local deve continuar devolvendo
+  `status_upload: "local"`.
 
 ### Definition of Done
-- `GET /saude` reporta o backend `oci` ativo.
-- Uma execução grava os dois objetos no bucket e retorna
-  `"status_upload": "concluido"`.
+- `scripts/verificar_oci.py` termina com exit 0 — **já atendido em 17/11**.
+- `GET /saude?profundo=true` reporta `oci` ativo e bucket acessível, sem aviso —
+  **já atendido em 17/11**.
+- Uma execução do pipeline grava os dois objetos e retorna
+  `"status_upload": "concluido"` — **pendente, só falta cota**.
+- `.venv\Scripts\python.exe -m pytest tests -q` continua em 34 passed.
 - Os 8 itens do checklist passam a estar verificados.
 
 ---
 
 ## 15. Handoff Integrity Check
 
-- [x] Estado atual reconciliado com o handoff anterior (bloqueios do OCI, do
-      `gh` e da chave do Gemini resolvidos ou atualizados).
+- [x] Estado atual reconciliado: a integração OCI saiu de "implementada, nunca
+      executada" para **verificada contra o serviço real**; o que resta do item 6
+      é a prova pelo pipeline, bloqueada por cota do Gemini, não pelo OCI.
+      Railway e No Country seguem PENDING, dependendo de sessão do usuário.
 - [x] Requisitos P0 ativos preservados, com citações literais do usuário.
 - [x] Aprovações explícitas registradas; nenhuma inventada.
 - [x] Abordagens que falharam retidas com a substituição adotada.
-- [x] Arquivos e status conferidos contra o repositório.
+- [x] Arquivos e status conferidos contra o repositório em 17/11.
 - [x] Rótulos de evidência usados com precisão — o item 6 do checklist continua
-      marcado como **não verificado**.
-- [x] Próximos passos obsoletos do handoff anterior removidos.
+      marcado como **não verificado**; os 33 testes foram reexecutados hoje.
+- [x] Próximos passos obsoletos removidos (o passo "redefinir a senha do OCI"
+      saiu).
 - [x] Nenhum segredo neste documento.
 - [x] Próxima ação executável, com critério de sucesso objetivo.
+- [x] Contradição de prazo marcada como `[NEEDS CONFIRMATION]`.

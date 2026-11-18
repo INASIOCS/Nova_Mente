@@ -25,6 +25,23 @@ def test_saude_reporta_backends():
     assert corpo["status"] == "ok"
     assert "storage_backend_ativo" in corpo
     assert "caminho_llm" in corpo
+    # sem ?profundo, o healthcheck nao toca na rede: nada a afirmar sobre o bucket
+    assert corpo["bucket_acessivel"] is None
+
+
+def test_saude_profundo_checa_o_bucket(monkeypatch):
+    """O teste nao pode depender do .env nem de credenciais do OCI."""
+    from app.storage import factory
+    from app.storage.local import LocalStorage
+
+    monkeypatch.setattr(factory, "criar_storage", lambda *a, **k: (LocalStorage(), None))
+
+    r = cliente.get("/saude", params={"profundo": "true"})
+    assert r.status_code == 200
+    corpo = r.json()
+    # com o backend local o bucket e um diretorio, sempre disponivel
+    assert corpo["bucket_acessivel"] is True
+    assert corpo["storage_backend_ativo"] == "local"
 
 
 def test_opcoes_lista_todos_os_eixos():

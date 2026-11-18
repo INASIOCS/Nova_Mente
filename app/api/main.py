@@ -105,13 +105,28 @@ def raiz() -> dict:
 
 
 @app.get("/saude", tags=["status"])
-def saude() -> dict:
-    """Diagnóstico de configuração — útil para validar o deploy."""
+def saude(profundo: bool = False) -> dict:
+    """Diagnóstico de configuração — útil para validar o deploy.
+
+    Com `?profundo=true`, confirma também que o bucket responde. Essa checagem
+    é opcional de propósito: este endpoint é o healthcheck do deploy e a camada
+    Always Free tem cota de requisições de API, que um ping a cada poucos
+    segundos consumiria sem necessidade.
+    """
     cfg = get_settings()
     from app.agents.llm import get_cliente_llm
     from app.storage.factory import criar_storage
 
     storage, aviso = criar_storage()
+
+    bucket_acessivel: bool | None = None
+    if profundo:
+        try:
+            bucket_acessivel = storage.disponivel()
+        except Exception as exc:  # nunca derruba o healthcheck
+            bucket_acessivel = False
+            aviso = f"{aviso + ' | ' if aviso else ''}Falha ao checar o bucket: {exc}"
+
     return {
         "status": "ok",
         "gemini_configurado": cfg.gemini_configurado,
@@ -120,6 +135,7 @@ def saude() -> dict:
         "storage_backend_configurado": cfg.storage_backend,
         "storage_backend_ativo": storage.nome,
         "bucket": storage.bucket,
+        "bucket_acessivel": bucket_acessivel,
         "aviso_storage": aviso,
     }
 

@@ -202,8 +202,30 @@ def main() -> int:
             )
 
     SAIDA.mkdir(parents=True, exist_ok=True)
-    (SAIDA / "RESUMO.json").write_text(
-        json.dumps(resumo, ensure_ascii=False, indent=2), encoding="utf-8"
+    caminho_resumo = SAIDA / "RESUMO.json"
+
+    # Rodar um subconjunto (ex.: `gerar_exemplos.py 5`) não pode apagar o
+    # registro dos outros cenários, cujos arquivos continuam em examples/.
+    # Regra: um resultado novo "ok" sempre substitui o anterior; um "erro"
+    # só ocupa a vaga se ainda não houver um "ok" ali — senão uma falha de
+    # cota deixaria o RESUMO em desacordo com os arquivos presentes.
+    anteriores: list[dict] = []
+    if caminho_resumo.exists():
+        try:
+            carregado = json.loads(caminho_resumo.read_text(encoding="utf-8"))
+            anteriores = [r for r in carregado if isinstance(r, dict) and "id" in r]
+        except (OSError, ValueError):
+            anteriores = []
+
+    por_id = {r["id"]: r for r in anteriores}
+    for novo in resumo:
+        antigo = por_id.get(novo["id"])
+        if novo.get("status") == "ok" or antigo is None or antigo.get("status") != "ok":
+            por_id[novo["id"]] = novo
+
+    caminho_resumo.write_text(
+        json.dumps([por_id[i] for i in sorted(por_id)], ensure_ascii=False, indent=2),
+        encoding="utf-8",
     )
 
     print(f"\n{'=' * 70}")

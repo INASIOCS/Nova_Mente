@@ -51,6 +51,10 @@ class Settings(BaseSettings):
     oci_namespace: str = ""
     oci_bucket_name: str = "novamente-conteudos-educativos"
     oci_region: str = "sa-saopaulo-1"
+    # OCID do compartimento onde o bucket deve ser criado. Vazio = compartimento
+    # raiz do tenancy. Usado apenas por scripts/verificar_oci.py --criar-bucket;
+    # a aplicação nunca cria recursos na nuvem por conta própria.
+    oci_compartment_id: str = ""
 
     @property
     def base_dir(self) -> Path:

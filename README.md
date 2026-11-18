@@ -333,14 +333,36 @@ duas implementações selecionadas pela variável `STORAGE_BACKEND`:
 Para ativar o OCI:
 
 1. No console da OCI, crie um bucket na camada Always Free (nome sugerido:
-   `novamente-conteudos-educativos`).
-2. Gere um par de chaves de API em *Identity → Users → API Keys* e baixe a
-   chave privada.
-3. Configure o arquivo `~/.oci/config` com `user`, `tenancy`, `fingerprint`,
-   `key_file` e `region`.
+   `novamente-conteudos-educativos`), escopo *Namespace*, camada **Standard**,
+   sem acesso público, com *auto-tiering* e versionamento desligados e
+   criptografia gerenciada pela Oracle. Qualquer outra combinação pode sair da
+   camada gratuita.
+2. Gere um par de chaves de API em *Meu perfil → Tokens e chaves → Adicionar
+   chave API*. A chave **privada** só pode ser baixada no instante da criação;
+   se a janela fechar antes, a chave é inútil e precisa ser recriada.
+   Alternativa mais segura: gerar o par localmente e usar *Colar chave pública*,
+   que dispensa download.
+3. Guarde a chave privada **fora da pasta do projeto** (ex.: `~/.oci/`) e
+   configure `~/.oci/config` com `user`, `tenancy`, `fingerprint`, `key_file` e
+   `region`.
 4. No `.env`, defina `STORAGE_BACKEND=oci` e ajuste `OCI_BUCKET_NAME` e
-   `OCI_REGION`.
-5. Confirme com `GET /saude`, que reporta o backend ativo.
+   `OCI_REGION`. Deixar `OCI_NAMESPACE` vazio faz o código descobrir o namespace
+   sozinho; preenchê-lo economiza uma chamada por execução.
+5. Valide a cadeia inteira de uma vez:
+
+   ```bash
+   python scripts/verificar_oci.py
+   ```
+
+   O script confere, em ordem, o arquivo de configuração, a credencial, o
+   namespace, o bucket e uma escrita/leitura real de um objeto de teste — que
+   ele mesmo remove no fim. Ele para no primeiro elo quebrado e diz o que
+   corrigir, sem imprimir segredos. Com `--criar-bucket`, cria o bucket caso
+   ainda não exista.
+
+6. Confirme pela API com `GET /saude?profundo=true`, que reporta o backend ativo
+   e se o bucket responde. Sem `profundo`, o endpoint não toca na rede — ele é o
+   healthcheck do deploy e a camada Always Free tem cota de requisições.
 
 Quando a aplicação roda **dentro** da OCI, o código tenta automaticamente
 autenticação por **Resource Principal**, dispensando chaves estáticas.
