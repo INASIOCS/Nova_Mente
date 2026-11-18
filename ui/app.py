@@ -21,6 +21,16 @@ _conflito = sys.modules.get("app")
 if _conflito is not None and not hasattr(_conflito, "__path__"):
     del sys.modules["app"]
 
+from app.core.segredos_nuvem import (  # noqa: E402
+    aplicar_segredos_do_streamlit,
+)
+
+# Na Streamlit Community Cloud nao existe .env: as credenciais chegam pelo
+# painel (Settings -> Secrets). A ponte copia esses segredos para o ambiente
+# e precisa rodar ANTES da primeira leitura da configuracao. Fora da nuvem
+# ela nao faz nada e o .env segue sendo a fonte da verdade.
+DIAGNOSTICO_SEGREDOS = aplicar_segredos_do_streamlit()
+
 from app.core.config import get_settings  # noqa: E402
 from app.export.exporters import (  # noqa: E402
     para_csv_anki,

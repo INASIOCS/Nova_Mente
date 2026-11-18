@@ -387,6 +387,34 @@ docker run -p 8080:8080 --env-file .env -e SERVICE=api novamente   # API REST
 
 ## Deploy
 
+### Streamlit Community Cloud (link público da demonstração)
+
+É o caminho usado para publicar a interface para a equipe e para a avaliação.
+A nuvem do Streamlit instala o `requirements.txt` e executa `ui/app.py`.
+
+1. Em <https://share.streamlit.io>, entrar com a conta do GitHub e autorizar o
+   acesso ao repositório `INASIOCS/Nova_Mente`.
+2. *Create app* → *Deploy a public app from GitHub*, com:
+   - Repository: `INASIOCS/Nova_Mente`
+   - Branch: `main`
+   - Main file path: `ui/app.py`
+   - URL: o subdomínio desejado (ex.: `nova-mente`).
+3. Em *Advanced settings → Secrets*, colar o conteúdo de
+   `.streamlit/secrets.toml.example` já preenchido. No mínimo a
+   `GOOGLE_API_KEY`. **A chave é digitada pela pessoa responsável, nunca
+   versionada.**
+4. *Deploy*. O primeiro build leva alguns minutos (o SDK do OCI é grande).
+
+Observações:
+
+- Sem a seção `[oci]` nos *Secrets*, a aplicação grava em disco local e avisa na
+  interface que o backend obrigatório não foi exercitado — o comportamento
+  honesto já descrito acima.
+- O disco da nuvem é efêmero: o que for salvo localmente some a cada reinício.
+- A quota do Gemini é compartilhada por todos que abrirem o link. Para uma
+  demonstração pública, vale ligar o modo econômico nos *Secrets*
+  (`AGENTE_ROTEADOR_ATIVO = "false"` e `MAX_REVISOES = "0"`).
+
 ### Railway
 
 O repositório já contém `Dockerfile` e `railway.json`. No painel do Railway:

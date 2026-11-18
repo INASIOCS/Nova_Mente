@@ -34,3 +34,9 @@ requests
 
 # --- Apresentacao ---
 python-pptx
+
+# --- Compatibilidade com a Streamlit Community Cloud ---
+# O ChromaDB exige sqlite3 >= 3.35 e a imagem da nuvem pode trazer uma versão
+# anterior. O wheel existe apenas para Linux; no Windows o marcador ignora a
+# linha. A troca do módulo acontece em app/core/segredos_nuvem.py.
+pysqlite3-binary; sys_platform == "linux"
