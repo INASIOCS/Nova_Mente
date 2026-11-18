@@ -137,6 +137,27 @@ estava pendente. Quando o backend local entra em ação, o campo de status retor
 "local" em vez de "concluido" e a interface exibe um aviso: a degradação fica
 visível em vez de ser mascarada.
 
+A integração está ativa e foi exercitada contra o serviço real. O bucket
+novamente-conteudos-educativos foi criado na região Brasil Leste, em São Paulo,
+com camada de armazenamento Standard, acesso privado, sem versionamento e sem
+estratificação automática — uma combinação que permanece inteiramente dentro da
+Always Free, já que versionamento multiplica o volume armazenado e a
+estratificação move objetos para uma camada cobrada. A autenticação usa um par
+de chaves de API gerado localmente, com apenas a metade pública registrada no
+console, e a chave privada é mantida fora do repositório e fora da pasta
+sincronizada do projeto.
+
+Para tornar essa configuração reproduzível por qualquer integrante da equipe, o
+repositório inclui um diagnóstico, scripts/verificar_oci.py, que percorre em
+ordem o arquivo de configuração, a credencial, o namespace do tenancy, a
+existência do bucket e uma escrita e leitura reais de um objeto de teste,
+removido ao final. Ele interrompe no primeiro elo que falha e informa o que
+corrigir, sem imprimir segredos. O endpoint de diagnóstico da API acompanha a
+mesma lógica: GET /saude relata o backend ativo, e GET /saude?profundo=true
+também confirma que o bucket responde. A checagem do bucket é opcional de
+propósito, porque esse endpoint serve de healthcheck do deploy e a camada
+gratuita tem cota de requisições de API.
+
 ## 4. Decisões de projeto e por quê
 
 Degradação explícita em todas as camadas. Cada componente tem um caminho de
@@ -224,7 +245,9 @@ piso o conteúdo cabe, o slide ganha uma continuação em vez de cortar o texto.
 
 ## 8. Qualidade e testes
 
-O projeto tem 33 testes automatizados que não consomem quota da API. Eles
+O projeto tem 34 testes automatizados que não consomem quota da API nem exigem
+credenciais da Oracle Cloud — o diagnóstico de storage é injetado nos testes,
+de modo que a suíte roda igual em qualquer máquina da equipe. Eles
 validam o contrato de dados contra os exemplos literais do briefing, a
 segmentação com sobreposição, a detecção de números órfãos e os exportadores,
 inclusive a montagem da apresentação: número de slides, pergunta e gabarito
@@ -237,9 +260,16 @@ apenas os valores da estrutura.
 
 ## 9. Limitações conhecidas e próximos passos
 
-A cota diária do free tier do Gemini limita o sistema a cerca de seis execuções
-completas por dia, o que é suficiente para demonstração mas não para uso
-contínuo. Uma conta paga ou um modelo local removeria essa restrição.
+A cota do free tier do Gemini é a restrição operacional mais sentida, e são duas
+restrições, não uma: vinte requisições de geração por dia e cinco por minuto.
+Como uma execução completa dispara três chamadas em sequência, e cinco quando há
+rodada de revisão, uma única execução pode esbarrar sozinha no limite por
+minuto. Some-se a isso que tentativas malsucedidas também consomem o saldo
+diário, de modo que repetir um comando logo após um erro 429 desperdiça cota.
+Na prática, são cerca de seis execuções completas por dia, suficiente para
+demonstração mas não para uso contínuo. O sistema oferece um modo econômico por
+variáveis de ambiente, que desliga o Roteador e as revisões e reduz o consumo a
+duas chamadas. Uma conta paga ou um modelo local removeria a restrição.
 
 O score de ancoragem é naturalmente mais baixo para perfis não técnicos, pela
 razão explicada no cenário 4. Um refinamento natural seria calibrar o limite de
