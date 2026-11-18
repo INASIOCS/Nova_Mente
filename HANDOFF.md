@@ -39,6 +39,13 @@ O que ainda falta para o item 6 ficar 100%: **uma execução do pipeline complet
 (com LLM) devolvendo `status_upload: "concluido"` dentro da resposta. Isso não é
 limitação do OCI — é a cota diária do Gemini, esgotada hoje.
 
+**Novidade da madrugada de 18/11:** a interface está **publicada e acessível**
+em <https://nova-mente.streamlit.app>, na Streamlit Community Cloud, a partir do
+`main` do GitHub. O link é público e já foi preparado para ser enviado ao grupo.
+Nessa nuvem a persistência cai para disco local (sem a seção `[oci]` nos
+segredos) e o disco é efêmero — o OCI continua sendo exercitado pela máquina do
+usuário.
+
 ### Evidence Summary
 
 - **IMPLEMENTED:** pipeline completo — ingestão (PDF/MD/texto), RAG (chunking,
@@ -82,8 +89,9 @@ limitação do OCI — é a cota diária do Gemini, esgotada hoje.
   verificada, mas nenhuma resposta gerada pelo pipeline carregou ainda
   `status_upload: "concluido"`. Bloqueado hoje pela cota diária do Gemini
   (ver Known Issues); é um comando só quando a cota voltar.
-- Deploy no Railway (pendente — a `GOOGLE_API_KEY` precisa ser inserida pelo
-  usuário).
+- Deploy no Railway (pendente, e agora **opcional**: a publicação para o grupo
+  e a avaliação saiu pela Streamlit Community Cloud, que é gratuita. O Railway
+  segue preparado no repositório caso seja preciso expor também a API REST).
 - Anotações no No Country (pendente — exige sessão autenticada do usuário).
 - Cenário 5 de demonstração (ingestão de PDF → Tutorial) ainda não gerado:
   três tentativas em 17/11 bateram no limite por minuto e depois no diário.
@@ -150,6 +158,30 @@ do pipeline completo
   `bucket_acessivel: true`, sem aviso — **já atendido**.
 - Uma execução do pipeline grava os dois objetos e a resposta traz
   `"status_upload": "concluido"` — **pendente**.
+
+---
+
+### Workflow: Deploy na Streamlit Community Cloud
+**Status:** DONE — no ar em <https://nova-mente.streamlit.app> (18/11, 00h)
+
+**Completed**
+- App criado em share.streamlit.io a partir de `INASIOCS/Nova_Mente`, branch
+  `main`, arquivo `ui/app.py`, Python 3.12.
+- `GOOGLE_API_KEY` e o modo econômico (`AGENTE_ROTEADOR_ATIVO=false`,
+  `MAX_REVISOES=0`) colados em *Advanced settings -> Secrets* pelo usuário.
+- `app/core/segredos_nuvem.py` faz a ponte `st.secrets` -> variáveis de
+  ambiente, porque na nuvem não existe `.env`. Fora da nuvem não faz nada.
+- `.streamlit/secrets.toml.example` é o modelo versionado (sem valores).
+- Verificado no ar: a interface carrega e o aviso de cota aparece corretamente.
+
+**Regra operacional — não esquecer**
+- Todo commit que mexa em arquivo **fora** de `ui/app.py` exige **Reboot app**
+  no painel. Ver o Finding sobre o cache de módulos, na seção 6.
+
+**Pending / opcional**
+- Seção `[oci]` nos segredos, para exercitar o Object Storage também pela
+  nuvem. Exige colar a chave privada no painel de um terceiro — decisão do
+  usuário, hoje deliberadamente não feita.
 
 ---
 
@@ -369,6 +401,31 @@ o balde responde, a credencial funciona e os objetos estão lá.**
   é arriscado por causa do limite por minuto.
 - **Confidence:** CONFIRMED (17/11)
 
+### Finding: A Streamlit Cloud recarrega o script, mas não os módulos
+- **Finding:** quando chega um commit novo, a Streamlit Community Cloud baixa os
+  arquivos e **re-executa apenas o script principal** (`ui/app.py`). Os módulos
+  Python já importados (`app/agents/llm.py`, `app/pipeline.py`, ...) continuam
+  **em memória, na versão antiga**. O app passa a rodar metade do código novo e
+  metade do antigo.
+- **Evidence (18/11, três ciclos seguidos):**
+  1. Push com `from app.agents.llm import ErroQuota` no topo da UI →
+     `ImportError` na nuvem, porque o `llm.py` em memória ainda era o anterior.
+     O mesmo arquivo subia sem erro no local, onde o processo nasce limpo.
+  2. Push seguinte trocando o import por `getattr(exc, "cota_esgotada", False)`
+     → a tela mostrou "Erro inesperado" com o texto `ErroQuota: Cota da API do
+     Gemini esgotada.` dentro: UI nova lendo exceção de um `llm.py` velho, que
+     ainda não tinha o atributo.
+  3. Depois do **Reboot app**, tudo alinhado e o painel de cota correto no ar.
+- **Impact:** todo commit que mexa em arquivo **fora** do `ui/app.py` exige
+  Reboot no painel (*Manage app -> menu ... -> Reboot app*). Mudança só no
+  script principal pega sozinha.
+- **Correção de registro:** a mensagem do commit `4f5a28d` atribui esse
+  `ImportError` ao conflito de nome entre `ui/app.py` e o pacote `app`. **Essa
+  explicação está errada** — a causa é o cache de módulos descrito aqui. A
+  mudança daquele commit continua válida por outro motivo: um import a menos no
+  topo deixa a interface menos acoplada ao pacote.
+- **Confidence:** CONFIRMED (18/11, observado no ar nos três ciclos)
+
 ### Finding: Nem todo modelo Gemini está disponível para esta chave
 - **Finding:** `gemini-2.5-flash` responde *"no longer available to new users"*;
   `gemini-3.8-flash` e `gemini-flash-latest` devolvem `504 DeadlineExceeded`.
@@ -501,6 +558,15 @@ o balde responde, a credencial funciona e os objetos estão lá.**
   login/importação de cookies no painel interno.
 - **Do not repeat unless:** a sessão tiver sido estabelecida no painel interno.
 
+### Primeiro diagnóstico do `ImportError` na Streamlit Cloud
+- **Result / Error:** atribuí a falha ao conflito de nome entre `ui/app.py` e o
+  pacote `app`, e registrei isso na mensagem do commit `4f5a28d`.
+- **Why:** o conflito existe de fato e já tinha mordido antes (`c093108`), então
+  pareceu a explicação óbvia. A causa real era o cache de módulos da nuvem.
+- **Replacement:** conferir qual versão de cada arquivo está realmente rodando
+  antes de concluir — a mistura aparece no texto do erro, não no log de deploy.
+- **Do not repeat unless:** o erro ocorrer num processo recém-iniciado.
+
 ### Leitura do PDF pela ferramenta Read
 - **Result / Error:** `pdftoppm is not installed`.
 - **Replacement:** texto extraído por script Node; conteúdo preservado aqui.
@@ -534,6 +600,9 @@ o balde responde, a credencial funciona e os objetos estão lá.**
 | `ui/app.py` | created | Streamlit com identidade institucional; aba de quiz interativo. |
 | `app/export/slides.py` | created | Deck .pptx montado por código, sem template externo. |
 | `.streamlit/config.toml` | created | Tema (navy/ouro) alinhado ao deck. |
+| `app/core/segredos_nuvem.py` | created | Ponte `st.secrets` -> ambiente na Streamlit Cloud; materializa a credencial OCI se houver seção `[oci]`. Silenciosa fora da nuvem. |
+| `.streamlit/secrets.toml.example` | created | Modelo dos segredos da nuvem. **Nunca preencher com valores reais** — o arquivo é versionado. |
+| `tests/test_quota.py` | created | Reconhecimento do 429 de cota, com a resposta real de 17/11. |
 | `.claude/launch.json` | created | Sobe a interface (8501) e a API (8000) localmente. |
 | `scripts/gerar_exemplos.py` | created | Gera os cenários de demonstração (consome quota). |
 | `scripts/gerar_pdf_documentacao.py` | created | Refaz `docs/NovaMente_Documentacao.pdf`. |
@@ -546,7 +615,7 @@ o balde responde, a credencial funciona e os objetos estão lá.**
 | `README.md` | created | Setup do OCI documentado a partir da linha ~335. |
 | `.env` | modified pending | **Não versionado.** `STORAGE_BACKEND=local` → virar `oci`. |
 | `Dockerfile`, `entrypoint.sh`, `railway.json` | created | Deploy; `SERVICE=ui\|api`. |
-| `tests/` | created | 33 testes, sem consumo de quota. |
+| `tests/` | created | 40 testes, sem consumo de quota. |
 
 ---
 
@@ -609,6 +678,13 @@ Teste rápido de autenticação do OCI, sem subir a aplicação:
 - **Avoid:** repetir imediatamente um comando que deu 429; a tentativa falha
   consome saldo diário.
 - **Action:** esperar ≥60s entre tentativas; modo econômico para gerar ao vivo.
+- **Na interface (desde 18/11):** o 429 de cota não vaza mais para a tela. A UI
+  reconhece a recusa, explica o limite, calcula o horário de volta a partir do
+  `retry_delay` da resposta e oferece um dos materiais de `examples/`. O
+  pipeline aborta na primeira recusa, em vez de queimar o resto do saldo.
+- **Atenção com o link público:** a cota é do projeto, não por pessoa. Todo
+  mundo que abrir <https://nova-mente.streamlit.app> consome o mesmo saldo de
+  20/dia.
 
 ### Issue: Segredos expostos no chat
 - **Confidence:** CONFIRMED
@@ -682,8 +758,8 @@ apareceram no balde.
    prazo é 22/11. Roteiro pronto em `docs/ROTEIRO_VIDEO_DEMO.md`. Gravar,
    subir no YouTube e enviar o link no painel, em *Projeto*.
 2. Atualizar o item 6 do checklist (seção 6) com a evidência do pipeline.
-3. Deploy no Railway (a `GOOGLE_API_KEY` deve ser inserida pelo usuário) e
-   acrescentar a URL pública ao entregável 4 (*Links*).
+3. Acrescentar a URL pública <https://nova-mente.streamlit.app> ao entregável
+   4 (*Links*) do No Country. O deploy já está no ar; o Railway virou opcional.
 4. Opcional: publicar `docs/anotacoes-nocountry.md` no canal `general` do
    Discord da equipe.
 5. Após a entrega: rotacionar as duas credenciais expostas (seção 12).
