@@ -6,7 +6,9 @@
 **Contexto:** Hackathon ONE G10 — Projeto 1 — Oracle Next Education & Alura
 **Project Root:** `C:\Users\inasio\OneDrive\Área de Trabalho\Projeto_Nova_Mente`
 **Repositório:** https://github.com/INASIOCS/Nova_Mente (público, branch `main`)
-**Prazo registrado:** segunda-feira, 16/11/2026 — **já passou** (ver seção 13)
+**Prazo real:** domingo, **22/11/2026, 23:59** — confirmado em 17/11 no próprio
+painel do No Country (*Projeto · Aberto até dom., 22 de nov., 23:59*). O
+"16/11" que constava aqui estava errado. Restam ~5 dias.
 
 ---
 
@@ -176,14 +178,41 @@ do pipeline completo
 
 ---
 
-### Workflow: Anotações no No Country
-**Status:** PENDING
+### Workflow: Entrega no No Country
+**Status:** IN PROGRESS — 3 de 4 entregáveis enviados
 
-- Página: https://talent.nocountry.tech/my-simulation/communication
-- Rascunho pronto e versionado em `docs/anotacoes-nocountry.md`.
-- O usuário autorizou publicar diretamente, assinando como ele: *"Você pode
-  publicar direto, faça os comentários como eu Inasio."*
-- Depende da sessão autenticada do usuário, pelo mesmo motivo do Railway.
+**Corrigido em 17/11, olhando o painel logado**
+- A página `/my-simulation/communication` **não tem campo de publicação**. Ela é
+  informativa e trata do **Discord** como espaço de comunicação da equipe
+  (convite: `discord.gg/wbJTXGmTba`; canais `general`, `notificaciones`,
+  `sprint-meet-obligatorio` e por papel). A premissa anterior deste handoff —
+  "a página onde vamos colocando todas as anotações" — estava errada. O texto de
+  `docs/anotacoes-nocountry.md` serve para o Discord, não para aquela página.
+- A entrega de verdade fica em `/my-simulation/deliverables`
+  (menu **Projeto**). Qualquer integrante envia ou edita enquanto estiver
+  aberto, e **cada envio substitui a versão anterior para toda a equipe**.
+
+**Estado dos 4 entregáveis (17/11)**
+| # | Entregável | Situação |
+|---|---|---|
+| 1 | Documentação (PDF) | ✅ `NovaMente_Documentacao.pdf` (13 kB) — confere com o arquivo local |
+| 2 | Vídeo demo (link do YouTube) | ❌ **não enviado** — é a única lacuna |
+| 3 | Ferramentas | ✅ 10 itens, inclusive Claude Code e Docker |
+| 4 | Links | ✅ Repositório GitHub — NovaMente |
+
+**Contexto da equipe**
+- Equipe `G10-BRASIL-equipo 9`, projeto registrado na plataforma como
+  **"NuevaMente"** (o repositório usa *NovaMente* — divergência cosmética).
+- Papel do usuário no painel: **UX/UI Designer**.
+- 9 integrantes: Inasio, TIAGO, Carlos, Enoque, Aguinaldo, Thiago, Davi,
+  Vanessa e Luis Felipe (primeiros nomes como o painel exibe).
+- Avaliação 360 do usuário: concluída em 17/11.
+
+**Next Step**
+- Gravar e publicar o vídeo demo, seguindo `docs/ROTEIRO_VIDEO_DEMO.md`, e
+  enviar o link do YouTube no entregável 2.
+- Opcional: publicar o texto de `docs/anotacoes-nocountry.md` no canal
+  `general` do Discord da equipe.
 
 ---
 
@@ -231,8 +260,12 @@ do pipeline completo
 - *"é um projeto que tem um PDF que você precisa ler, cria ele na pasta e depois
   subir para o GIT"* — **FEITO**.
 - *"https://talent.nocountry.tech/my-simulation/communication que é a pagina onde
-  devemos ir colocando lá todas as anotações"* — **PENDENTE**.
-- Prazo registrado: *"Até Segunda-feira 16/11/2026"* — ver seção 13.
+  devemos ir colocando lá todas as anotações"* — **SUPERADO pelos fatos**: em
+  17/11, com a sessão aberta, confirmou-se que essa página não tem campo de
+  publicação; ela aponta para o Discord da equipe. A intenção (registrar o
+  andamento para o grupo) continua válida — muda o destino.
+- Prazo: *"Até Segunda-feira 16/11/2026"* — **incorreto**. O painel mostra
+  22/11/2026, 23:59.
 - *"Sim, acredito que sim"* — outros integrantes do Grupo 10 também devem
   commitar; manter o histórico legível e por camada.
 
@@ -604,15 +637,14 @@ Teste rápido de autenticação do OCI, sem subir a aplicação:
 
 ## 13. Unresolved Questions
 
-- **[NEEDS CONFIRMATION] O prazo registrado (segunda, 16/11/2026) já passou** —
-  hoje é 17/11/2026. Houve prorrogação? A entrega no No Country foi feita pelo
-  usuário por fora? Isso muda a prioridade entre "fechar o item 6" e "publicar
-  as anotações". Perguntar antes de reordenar o trabalho.
+- **RESOLVIDO (17/11):** o prazo é **22/11/2026, 23:59**, lido no painel. Não
+  houve perda de entrega; restam ~5 dias.
 - **RESOLVIDO (17/11):** quem conduz o console web é o **usuário**, no Edge,
   enviando capturas e colando os dados; o agente faz a parte local. Funcionou
   bem para o OCI e é o modelo para o Railway e o No Country.
-- **[NEEDS CONFIRMATION]** Nomes dos demais integrantes do Grupo 10, para
-  creditar no README.
+- **RESOLVIDO (17/11):** os 9 integrantes aparecem no painel (lista no workflow
+  da entrega). Falta só decidir **se** e **como** creditá-los no README —
+  sobrenomes e papéis não estão todos visíveis, e a escolha é do usuário.
 
 ---
 
@@ -645,12 +677,16 @@ Depois confira, no JSON gerado em `examples/`, que
 `resposta.armazenamento_oci.status_upload == "concluido"` e que os objetos
 apareceram no balde.
 
-### Em seguida
-- Atualizar o item 6 do checklist (seção 6) com essa evidência.
-- Deploy no Railway (a `GOOGLE_API_KEY` deve ser inserida pelo usuário).
-- Publicar as anotações do `docs/anotacoes-nocountry.md` no No Country,
-  assinando como Inasio.
-- Após a entrega: rotacionar as duas credenciais expostas (seção 12).
+### Em seguida, por ordem de impacto na nota
+1. **Vídeo demo** — é o único entregável do No Country que falta (2 de 4), e o
+   prazo é 22/11. Roteiro pronto em `docs/ROTEIRO_VIDEO_DEMO.md`. Gravar,
+   subir no YouTube e enviar o link no painel, em *Projeto*.
+2. Atualizar o item 6 do checklist (seção 6) com a evidência do pipeline.
+3. Deploy no Railway (a `GOOGLE_API_KEY` deve ser inserida pelo usuário) e
+   acrescentar a URL pública ao entregável 4 (*Links*).
+4. Opcional: publicar `docs/anotacoes-nocountry.md` no canal `general` do
+   Discord da equipe.
+5. Após a entrega: rotacionar as duas credenciais expostas (seção 12).
 
 ### Constraints
 - Preservar as decisões aprovadas da seção 4.
