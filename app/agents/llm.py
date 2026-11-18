@@ -28,6 +28,11 @@ class ErroQuota(ErroLLM):
     partir de `segundos`, que vem do próprio `retry_delay` da resposta.
     """
 
+    # Marca reconhecível sem importar esta classe. A interface roda como script
+    # do Streamlit, onde o nome "app" é disputado pelo próprio arquivo; quanto
+    # menos ela precisar importar do pacote no topo, menos frágil ela fica.
+    cota_esgotada = True
+
     def __init__(self, mensagem: str, segundos: int | None = None) -> None:
         super().__init__(mensagem)
         self.segundos = segundos

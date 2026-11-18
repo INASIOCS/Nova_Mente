@@ -45,7 +45,6 @@ from app.ingestion.loader import (  # noqa: E402
     carregar_bytes,
     carregar_texto,
 )
-from app.agents.llm import ErroQuota  # noqa: E402
 from app.pipeline import ErroPipeline, adaptar_conteudo  # noqa: E402
 from app.schemas.content import (  # noqa: E402
     FormatoSaida,
@@ -464,19 +463,22 @@ if gerar and documento is not None:
                 st.session_state["respostas_quiz"] = {}
                 st.session_state["material_e_exemplo"] = None
                 status.update(label="Pipeline concluído", state="complete")
-            except ErroQuota as exc:
-                # Não é erro do sistema: é limite da API. O painel abaixo
-                # explica e oferece um material já gerado.
-                status.update(
-                    label="Cota diária do Gemini esgotada", state="error"
-                )
-                st.session_state["quota_esgotada"] = {"segundos": exc.segundos}
             except ErroPipeline as exc:
                 status.update(label="Falha no pipeline", state="error")
                 st.error(str(exc))
             except Exception as exc:  # noqa: BLE001
-                status.update(label="Erro inesperado", state="error")
-                st.error(f"{type(exc).__name__}: {exc}")
+                if getattr(exc, "cota_esgotada", False):
+                    # Não é erro do sistema: é o limite diário da API. O painel
+                    # logo abaixo explica e oferece um material já gerado.
+                    status.update(
+                        label="Cota diária do Gemini esgotada", state="error"
+                    )
+                    st.session_state["quota_esgotada"] = {
+                        "segundos": getattr(exc, "segundos", None)
+                    }
+                else:
+                    status.update(label="Erro inesperado", state="error")
+                    st.error(f"{type(exc).__name__}: {exc}")
 
 
 cota_esgotada = st.session_state.get("quota_esgotada")

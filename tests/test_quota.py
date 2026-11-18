@@ -49,3 +49,11 @@ def test_nao_confunde_outras_falhas_com_cota():
 def test_erro_de_cota_continua_sendo_um_erro_de_llm():
     # Quem só quer saber que a geração falhou segue capturando ErroLLM.
     assert issubclass(ErroQuota, ErroLLM)
+
+
+def test_a_cota_se_anuncia_por_atributo():
+    # A interface reconhece a cota sem importar esta classe: ela roda como
+    # script do Streamlit, onde importar do pacote `app` no topo é frágil.
+    erro = _erro_de_quota(Exception(MENSAGEM_REAL))
+    assert getattr(erro, "cota_esgotada", False) is True
+    assert getattr(Exception("qualquer outra"), "cota_esgotada", False) is False
