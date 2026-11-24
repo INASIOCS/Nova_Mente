@@ -1,7 +1,15 @@
-"""Cliente de LLM (Google Gemini) com saída JSON garantida.
+"""Clientes de LLM com saída JSON garantida.
 
-Primário: LangChain (`ChatGoogleGenerativeAI`) — alinhado ao edital.
+O provedor é escolhido por `LLM_PROVIDER` (`gemini`, o padrão, ou `nvidia`) e
+`get_cliente_llm()` devolve o cliente certo. Os dois expõem a mesma interface —
+`gerar_json`, `gerar_texto`, `caminho`, `disponivel` — e por isso o grafo de
+agentes não sabe, e não precisa saber, quem está do outro lado.
+
+Gemini — primário: LangChain (`ChatGoogleGenerativeAI`), alinhado ao edital.
 Fallback: SDK `google-generativeai` direto, caso o wrapper LangChain falhe.
+
+NVIDIA — HTTP direto contra a API compatível com OpenAI de build.nvidia.com,
+com `requests`, que já é dependência do projeto. Não adiciona SDK novo ao deploy.
 """
 
 from __future__ import annotations
@@ -20,12 +28,13 @@ class ErroLLM(Exception):
 
 
 class ErroQuota(ErroLLM):
-    """Cota da API do Gemini esgotada (HTTP 429 / RESOURCE_EXHAUSTED).
+    """Cota da API esgotada (HTTP 429 / RESOURCE_EXHAUSTED).
 
     Separada de ErroLLM porque o tratamento é outro: não adianta tentar de
     novo, nem cair para outro caminho de chamada — toda tentativa, inclusive a
-    que falha, consome o saldo diário. Quem captura decide quando voltar a
-    partir de `segundos`, que vem do próprio `retry_delay` da resposta.
+    que falha, consome o saldo. Quem captura decide quando voltar a partir de
+    `segundos`, que vem do próprio `retry_delay` (Gemini) ou do cabeçalho
+    `Retry-After` (NVIDIA) da resposta.
     """
 
     # Marca reconhecível sem importar esta classe. A interface roda como script
@@ -33,9 +42,16 @@ class ErroQuota(ErroLLM):
     # menos ela precisar importar do pacote no topo, menos frágil ela fica.
     cota_esgotada = True
 
-    def __init__(self, mensagem: str, segundos: int | None = None) -> None:
+    def __init__(
+        self,
+        mensagem: str,
+        segundos: int | None = None,
+        provedor: str = "Gemini",
+    ) -> None:
         super().__init__(mensagem)
         self.segundos = segundos
+        # Também lido pela interface via getattr, pelo mesmo motivo acima.
+        self.provedor = provedor
 
 
 # Marcas de uma resposta de cota esgotada, em qualquer um dos caminhos de
@@ -243,11 +259,155 @@ class ClienteGemini:
         return _extrair_json(bruto)
 
 
-_cliente: ClienteGemini | None = None
+class ClienteNvidia:
+    """Cliente da API compatível com OpenAI de build.nvidia.com.
+
+    Mesma interface do `ClienteGemini`. Duas decisões deliberadas:
+
+    - Uma chamada, sem cair para "outro caminho" em caso de falha. Num 429 isso
+      só gastaria mais requisições do limite por minuto à toa.
+    - O raciocínio do modelo é opcional (`NVIDIA_THINKING`). Desligado, a mesma
+      pergunta leva cerca de um terço do tempo e dos tokens.
+    """
+
+    # Falhas transitórias do servidor, que valem uma segunda tentativa. O 429 não
+    # entra aqui de propósito.
+    _TRANSITORIOS = (502, 503, 504)
+
+    def __init__(self, temperatura: float = 0.3) -> None:
+        self._cfg = get_settings()
+        self.temperatura = temperatura
+        self.caminho = (
+            f"nvidia:{self._cfg.nvidia_model}"
+            if self._cfg.nvidia_configurado
+            else "indisponivel"
+        )
+
+    @property
+    def disponivel(self) -> bool:
+        return self._cfg.nvidia_configurado
+
+    def _cabecalhos(self) -> dict[str, str]:
+        return {
+            "Authorization": f"Bearer {self._cfg.nvidia_api_key.strip()}",
+            "Accept": "application/json",
+        }
+
+    def _corpo(
+        self, prompt_sistema: str, prompt_usuario: str, com_modo_json: bool
+    ) -> dict:
+        corpo: dict = {
+            "model": self._cfg.nvidia_model,
+            "messages": [
+                {"role": "system", "content": prompt_sistema},
+                {"role": "user", "content": prompt_usuario},
+            ],
+            "temperature": self.temperatura,
+            # Generoso pelo mesmo motivo do Gemini: com o raciocínio ligado, boa
+            # parte do orçamento vai para o pensamento antes da resposta.
+            "max_tokens": 16384,
+            "stream": False,
+            "chat_template_kwargs": {"enable_thinking": self._cfg.nvidia_thinking},
+        }
+        if com_modo_json:
+            corpo["response_format"] = {"type": "json_object"}
+        return corpo
+
+    def _enviar(self, corpo: dict):
+        import requests
+
+        url = f"{self._cfg.nvidia_base_url.rstrip('/')}/chat/completions"
+        try:
+            return requests.post(
+                url,
+                headers=self._cabecalhos(),
+                json=corpo,
+                timeout=self._cfg.nvidia_timeout,
+            )
+        except requests.Timeout as exc:
+            raise ErroLLM(
+                f"A NVIDIA não respondeu em {self._cfg.nvidia_timeout}s "
+                f"({self._cfg.nvidia_model}). O modelo pode estar sobrecarregado."
+            ) from exc
+        except requests.RequestException as exc:
+            raise ErroLLM(f"Falha de rede ao chamar a NVIDIA: {exc}") from exc
+
+    @staticmethod
+    def _espera(resposta) -> int | None:
+        """Segundos de espera sugeridos pelo cabeçalho `Retry-After`, se houver."""
+        bruto = resposta.headers.get("Retry-After")
+        try:
+            return int(float(bruto)) if bruto else None
+        except ValueError:
+            return None
+
+    def gerar_texto(self, prompt_sistema: str, prompt_usuario: str) -> str:
+        if not self.disponivel:
+            raise ErroLLM(
+                "NVIDIA não configurada. Defina NVIDIA_API_KEY no arquivo .env "
+                "(chave gratuita em https://build.nvidia.com)."
+            )
+
+        resposta = self._enviar(self._corpo(prompt_sistema, prompt_usuario, True))
+
+        # Nem todo modelo aceita `response_format`: sem ele, o `_extrair_json`
+        # abaixo já desembrulha cercas de markdown e acha o objeto.
+        if resposta.status_code in (400, 422) and "response_format" in resposta.text:
+            resposta = self._enviar(self._corpo(prompt_sistema, prompt_usuario, False))
+
+        if resposta.status_code in self._TRANSITORIOS:
+            logger.warning("NVIDIA devolveu %s; uma nova tentativa.", resposta.status_code)
+            resposta = self._enviar(self._corpo(prompt_sistema, prompt_usuario, True))
+
+        if resposta.status_code == 429:
+            raise ErroQuota(
+                "Limite de requisições da NVIDIA atingido.",
+                self._espera(resposta),
+                provedor="NVIDIA",
+            )
+        if resposta.status_code in (401, 403):
+            raise ErroLLM(
+                f"A NVIDIA recusou a chave (HTTP {resposta.status_code}). "
+                "Confira NVIDIA_API_KEY no .env."
+            )
+        if resposta.status_code != 200:
+            raise ErroLLM(
+                f"Falha ao chamar a NVIDIA: HTTP {resposta.status_code} — "
+                f"{resposta.text[:200]}"
+            )
+
+        try:
+            escolha = resposta.json()["choices"][0]
+            texto = escolha["message"].get("content") or ""
+        except (ValueError, KeyError, IndexError, TypeError) as exc:
+            raise ErroLLM("A NVIDIA devolveu uma resposta fora do formato esperado.") from exc
+
+        if not texto.strip():
+            motivo = escolha.get("finish_reason")
+            raise ErroLLM(
+                "A NVIDIA devolveu a resposta vazia"
+                + (
+                    " — o orçamento de tokens acabou antes do fim do raciocínio. "
+                    "Desligue NVIDIA_THINKING."
+                    if motivo == "length"
+                    else "."
+                )
+            )
+        return texto
+
+    def gerar_json(self, prompt_sistema: str, prompt_usuario: str) -> dict:
+        return _extrair_json(self.gerar_texto(prompt_sistema, prompt_usuario))
 
 
-def get_cliente_llm() -> ClienteGemini:
+_cliente: ClienteGemini | ClienteNvidia | None = None
+
+
+def get_cliente_llm() -> ClienteGemini | ClienteNvidia:
+    """Cliente do provedor escolhido em `LLM_PROVIDER`, criado uma única vez."""
     global _cliente
     if _cliente is None:
-        _cliente = ClienteGemini()
+        if get_settings().provedor_llm == "nvidia":
+            _cliente = ClienteNvidia()
+        else:
+            _cliente = ClienteGemini()
     return _cliente

@@ -13,6 +13,7 @@ Uso:
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -27,7 +28,10 @@ from app.pipeline import adaptar_conteudo  # noqa: E402
 from app.schemas.content import RequisicaoAdaptacao  # noqa: E402
 
 FONTES = RAIZ / "docs" / "fontes"
-SAIDA = RAIZ / "examples"
+# Pasta de saída. EXEMPLOS_SAIDA permite gerar uma rodada paralela (por exemplo
+# com outro provedor de LLM, para comparar) sem sobrescrever os exemplos
+# versionados em examples/, que são o estado entregue.
+SAIDA = RAIZ / os.environ.get("EXEMPLOS_SAIDA", "examples")
 
 VCN = FONTES / "oci_vcn_arquitetura_de_redes.md"
 OBJ = FONTES / "oci_object_storage_conceitos.txt"

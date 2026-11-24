@@ -310,6 +310,37 @@ completa. Para uma apresentação, há três recomendações:
 Ao estourar a cota, a API devolve `429` e o pipeline propaga uma mensagem de erro
 explícita com o tempo de espera, em vez de falhar silenciosamente.
 
+### Provedor de LLM alternativo: NVIDIA
+
+Além dos 20 por dia, o free tier do Gemini limita a **5 requisições por minuto**,
+e uma execução completa dispara 3 chamadas em sequência. O sistema aceita um
+segundo provedor, escolhido por variável de ambiente, **sem alterar o grafo de
+agentes**: os quatro agentes só chamam `gerar_json`, e quem responde é o cliente
+do provedor ativo (`app/agents/llm.py`).
+
+```ini
+LLM_PROVIDER=nvidia            # padrão: gemini
+NVIDIA_API_KEY=nvapi-...       # chave gratuita em https://build.nvidia.com
+NVIDIA_MODEL=nvidia/nemotron-3.5-lightning-30b-a3b
+NVIDIA_EMBEDDING_MODEL=nvidia/nemotron-3.5-embed-1b
+```
+
+Os embeddings seguem o mesmo provedor, a menos que `EMBEDDING_PROVIDER` diga o
+contrário. Se o provedor escolhido estiver sem chave, o sistema **não** usa o
+outro às escondidas: cai para o embedding léxico e informa no diagnóstico.
+
+Medido nos mesmos cenários, com uma rodada cada: o Nemotron levou de 18 a 31 s por
+execução (contra 38 a 145 s do Gemini) e a cobertura léxica das fontes — a parte
+determinística da nota de ancoragem — ficou igual ou maior nos quatro cenários
+comparáveis. A **nota final de ancoragem não é comparável entre provedores**: ela
+combina um auditor LLM, e o Gemini tendia a dar nota máxima ao próprio texto,
+enquanto o Nemotron foi mais rígido.
+
+> ⚠️ O endpoint gratuito da NVIDIA é declaradamente para **prototipagem** e
+> registra o uso: não envie documentos confidenciais. Os limites de requisição não
+> são publicados oficialmente. Cada variável deve aparecer **uma única vez** no
+> `.env` — a última ocorrência vence e anula a anterior sem aviso.
+
 ### Documentos técnicos de origem
 
 | Arquivo | Formato | Tema |

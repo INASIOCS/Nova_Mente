@@ -1,14 +1,16 @@
 # Project Handoff — NovaMente
 
-**Last Updated:** 2026-11-17 ~21:15 (horário local do sistema, Windows)
-**Status:** ACTIVE — MVP funcional e testado; **integração com o OCI Object Storage executada e verificada de verdade**; falta uma execução do pipeline completo gravando no balde (bloqueada hoje pela cota diária do Gemini)
+**Last Updated:** 2026-11-24 (horário local do sistema, Windows)
+**Status:** ACTIVE — MVP funcional e testado; OCI Object Storage **verificado de ponta a ponta pelo pipeline** (24/11); provedor NVIDIA implementado e comparado em branch separada, **ainda não mesclada**
 **Project:** NovaMente — Sistema Inteligente de Adaptação e Geração de Conteúdo Educacional
 **Contexto:** Hackathon ONE G10 — Projeto 1 — Oracle Next Education & Alura
 **Project Root:** `C:\Users\inasio\OneDrive\Área de Trabalho\Projeto_Nova_Mente`
 **Repositório:** https://github.com/INASIOCS/Nova_Mente (público, branch `main`)
 **Prazo real:** domingo, **22/11/2026, 23:59** — confirmado em 17/11 no próprio
 painel do No Country (*Projeto · Aberto até dom., 22 de nov., 23:59*). O
-"16/11" que constava aqui estava errado. Restam ~5 dias.
+"16/11" que constava aqui estava errado. **[NEEDS CONFIRMATION] Em 24/11 esse prazo já passou:**
+não há registro nesta sessão do que foi enviado ao painel (vídeo demo, PDF atualizado,
+links). Perguntar ao usuário antes de tratar qualquer entregável como pendente.
 
 ---
 
@@ -38,6 +40,12 @@ criado, e o backend `oci` **gravou e leu objetos reais** no
 O que ainda falta para o item 6 ficar 100%: **uma execução do pipeline completo**
 (com LLM) devolvendo `status_upload: "concluido"` dentro da resposta. Isso não é
 limitação do OCI — é a cota diária do Gemini, esgotada hoje.
+
+**Novidade de 24/11 — item 6 fechado e provedor NVIDIA:** rodando o pipeline completo
+com `LLM_PROVIDER=nvidia`, as cinco respostas trouxeram
+`armazenamento_oci.status_upload: "concluido"` com `backend: "oci"`, e o balde passou a ter
+12 objetos (6 em `originais/`, 6 em `conteudos/`), listados direto pelo SDK. Ver o workflow
+"Provedor NVIDIA" abaixo. O Gemini continua sendo o padrão no código e no app publicado.
 
 **Novidade da madrugada de 18/11:** a interface está **publicada e acessível**
 em <https://nova-mente.streamlit.app>, na Streamlit Community Cloud, a partir do
@@ -248,8 +256,56 @@ do pipeline completo
 
 ---
 
+### Workflow: Provedor NVIDIA (branch `feat/provedor-nvidia`)
+**Status:** IMPLEMENTED + TESTED + comparado; **não mesclado em `main`** — decisão do usuário
+
+**Por que existe:** o free tier do Gemini limita a 5 req/min e 20/dia. O endpoint gratuito da
+NVIDIA (build.nvidia.com, API compatível com OpenAI) tem limite por minuto bem maior
+(~40 RPM segundo fontes de terceiros, **não oficial**) e oferece modelos de embedding.
+
+**Implementado**
+- `LLM_PROVIDER=gemini|nvidia` (padrão `gemini`); `EMBEDDING_PROVIDER` vazio = segue o LLM.
+- `app/agents/llm.py`: `ClienteNvidia` com a mesma interface do `ClienteGemini`, via
+  `requests` (sem SDK novo). Não repete 429; repete uma vez 502/503/504; reenvia sem
+  `response_format` se o modelo recusar; `ErroQuota` ganhou `provedor`.
+- `app/rag/embeddings.py`: embeddings NVIDIA em lotes de 16, com `input_type`
+  `passage`/`query`. Provedor sem chave cai para o léxico, **nunca** escondido no Gemini.
+- Variáveis: `NVIDIA_API_KEY`, `NVIDIA_MODEL`, `NVIDIA_EMBEDDING_MODEL`, `NVIDIA_THINKING`,
+  `NVIDIA_BASE_URL`, `NVIDIA_TIMEOUT`. `/saude` e a interface falam do provedor ativo.
+- `scripts/gerar_exemplos.py` aceita `EXEMPLOS_SAIDA` para não sobrescrever `examples/`.
+- `tests/test_provedor_nvidia.py`: 26 testes, sem rede e sem ler o `.env`. Suíte: 60 passed.
+
+**Resultado da comparação (1 rodada por cenário, mesmo documento e parâmetros)**
+| Cen. | Gemini nota / léxico / tempo | Nemotron nota / léxico / tempo |
+|---|---|---|
+| 1 | 0,82 / 52% / 45 s | 0,66 / 67% / 31 s |
+| 2 | 0,81 / 45% / 54 s | 0,72 / 47% / 28 s |
+| 3 | 0,82 / 53% / 38 s | 0,84 / 64% / 18 s |
+| 4 | 0,73 / 24% / 145 s | 0,56 / 30% / 19 s |
+| 5 | (nunca gerado) | 0,55 / 56% / 26 s |
+- **Leitura honesta:** a nota final é `0,65×auditor LLM + 0,35×léxico`. O Gemini se dava 1,0
+  como auditor (viés de autoaprovação já documentado); o Nemotron deu 0,55–0,95. Por isso a
+  nota final dele é menor mesmo com a cobertura léxica — determinística — igual ou maior nos
+  4 cenários comparáveis. **Notas finais de provedores diferentes não são comparáveis.**
+- **Latência:** 18–31 s por cenário, mesmo com uma rodada de revisão em todos (5 chamadas).
+- **Revisão é inconsistente com este modelo:** as 5 execuções dispararam revisão (auditor
+  mais rígido); a nota subiu em 2 (cen. 2 e 3) e caiu em 3 (cen. 1, 4, 5 — no 5, a clareza
+  foi de Alta para Média). Amostra pequena; considerar `MAX_REVISOES=0` ou manter a melhor
+  das duas versões. **Não alterado.**
+- Similaridade média de recuperação: 0,33 (Nemotron) vs 0,80 (Gemini) — escalas de cosseno
+  de modelos diferentes, não indicam por si só recuperação pior.
+- Modelos testados e descartados como padrão: ver seção 9.
+
+**Pending (decisão do usuário)**
+- Mesclar ou não em `main`. Se mesclar, o app publicado **continua no Gemini** até que
+  `LLM_PROVIDER` seja definido nos segredos da Streamlit Cloud.
+- Ajustar o limite de revisão, se o Nemotron for adotado.
+
+---
+
 ### Workflow: Cenário 5 de demonstração
-**Status:** PENDING
+**Status:** DONE na branch `feat/provedor-nvidia` (`examples/nvidia/cenario-5-...`, ingestão
+de PDF → Tutorial, gerado com o Nemotron em 24/11). Em `main`, `examples/` ainda não tem o 5.
 
 - Falhou com `429` em 15/11 — cota diária do free tier esgotada
   (~20 gerações/dia). A cota já deve ter renovado.
@@ -350,12 +406,13 @@ do pipeline completo
 | 3 | Orquestração com LLM | ✅ LangGraph, 4 agentes |
 | 4 | Mesmo conteúdo para ≥2 perfis e ≥2 formatos | ✅ cenários 1, 2 e 3 (mesmo doc de VCN) |
 | 5 | JSON estruturado + interface ou API REST | ✅ Pydantic + Streamlit **e** FastAPI |
-| 6 | OCI Object Storage (Always Free) | 🟡 balde criado e objetos reais gravados/lidos em 17/11; falta uma resposta do pipeline com `status_upload: "concluido"` |
+| 6 | OCI Object Storage (Always Free) | ✅ VERIFICADO em 24/11: 5 execuções do pipeline com `status_upload: "concluido"` (`backend: "oci"`) e 12 objetos no balde. Evidência em `examples/nvidia/` (branch `feat/provedor-nvidia`) |
 | 7 | ≥3 exemplos de execução | ✅ 4 versionados em `examples/` |
 | 8 | Documentação com diagrama de arquitetura | ✅ README + `docs/arquitetura.md` (Mermaid) |
 
-**O item 6 deixou de ser risco de infraestrutura e virou só uma questão de cota:
-o balde responde, a credencial funciona e os objetos estão lá.**
+**O item 6 está fechado:** o balde responde, a credencial funciona e o próprio pipeline
+gravou nele. Nota: `examples/` (Gemini, 15/11) segue trazendo `status_upload: "local"`,
+porque foi gerado antes do OCI; a prova com `"concluido"` vive em `examples/nvidia/`.
 
 ### Finding: A aplicação nunca cria o bucket sozinha — por decisão
 - **Finding:** `OCIObjectStorage.garantir_bucket(compartment_id)` não é chamado
@@ -491,6 +548,14 @@ o balde responde, a credencial funciona e os objetos estão lá.**
 - **Why:** a mesma imagem serve Railway e, depois, OCI Compute Always Free, sem
   acoplamento à plataforma.
 
+### Decision: Provedor de LLM selecionável, Gemini como padrão
+- **Chosen:** `LLM_PROVIDER` com `ClienteGemini` e `ClienteNvidia` atrás da mesma interface.
+- **Why:** os agentes só chamam `gerar_json`; trocar de provedor não toca o grafo. Manter o
+  Gemini como padrão preserva o estado avaliado e o app publicado.
+- **Ruled Out:** OpenAI e Anthropic — pagas, e a Anthropic não tem API de embeddings.
+- **Consequence:** NVIDIA via `requests` (sem SDK novo); provedor sem chave cai para o
+  léxico em vez de usar outro provedor escondido.
+
 ### Decision: Modo econômico de quota configurável
 - **Chosen:** `AGENTE_ROTEADOR_ATIVO` e `MAX_REVISOES` em variáveis de ambiente.
 - **Why:** o limite de ~20 gerações/dia inviabiliza demonstrações repetidas na
@@ -550,6 +615,16 @@ o balde responde, a credencial funciona e os objetos estão lá.**
 ### `models/text-embedding-004`
 - **Result / Error:** `404 not found for API version v1beta`.
 - **Replacement:** `models/gemini-embedding-001` (3072 dimensões).
+
+### Kimi K3.1 Pro e Mistral Large 4 como padrão NVIDIA
+- **Result / Error:** Kimi levou 42 s e 83 s para ~350 tokens; Mistral Large 4 estourou 120 s.
+- **Why:** modelos enormes no endpoint gratuito compartilhado. HYPOTHESIS para a causa exata.
+- **Replacement:** `nvidia/nemotron-3.5-lightning-30b-a3b` (2–6 s na mesma chamada).
+- **Do not repeat unless:** a latência do endpoint mudar; medir antes.
+
+### `nemotron-3.5-embed` sem `input_type`
+- **Result / Error:** HTTP 400 *"'input_type' parameter is required for asymmetric models"*.
+- **Replacement:** `passage` ao indexar e `query` ao buscar. Vetores de 2048 dimensões.
 
 ### Abrir Railway / No Country pelo navegador interno do Claude
 - **Result / Error:** redirecionamento para a tela de login.
@@ -673,6 +748,18 @@ Teste rápido de autenticação do OCI, sem subir a aplicação:
   problema do OCI** — a camada de storage já está verificada.
 - **Action:** rodar `scripts/gerar_exemplos.py 5` quando a cota voltar.
 
+### Issue: `.env` com variável repetida anula a anterior sem aviso
+- **Symptoms:** ao "trocar o modelo", uma linha `GEMINI_MODEL=nvidia/...` foi adicionada e
+  uma `GEMINI_EMBEDDING_MODEL=` ficou vazia — as duas sobrescreveram os valores corretos.
+- **Cause:** o carregador do `.env` usa a última ocorrência. CONFIRMED (24/11).
+- **Avoid:** nunca colar o exemplo de código do site da NVIDIA dentro do `.env`; ele não é
+  lido e ainda leva a chave junto. As variáveis da NVIDIA têm nomes próprios (`NVIDIA_*`).
+
+### Issue: Termos do endpoint gratuito da NVIDIA
+- Os limites (~40 RPM) vêm de fontes de terceiros; a NVIDIA não os publica. O tier hospedado
+  é declaradamente para **prototipagem** e registra o uso: não enviar dado confidencial.
+  Produção exige NVIDIA AI Enterprise. CONFIRMED pelas fontes, **não** pela documentação.
+
 ### Issue: Cota do Gemini — 5/min e 20/dia
 - **Confidence:** CONFIRMED
 - **Avoid:** repetir imediatamente um comando que deu 429; a tentativa falha
@@ -727,8 +814,10 @@ Teste rápido de autenticação do OCI, sem subir a aplicação:
 ## 14. Next Session — Start Here [P0]
 
 ### Immediate Objective
-Fechar o item 6 com a prova que falta: uma execução do **pipeline completo**
-gravando no OCI, com `status_upload: "concluido"` na resposta.
+**Perguntar ao usuário** o estado da entrega (o prazo de 22/11 passou) e se a branch
+`feat/provedor-nvidia` deve ser mesclada em `main`. O item 6, que era o objetivo desta
+seção, **já está fechado** (24/11); o texto abaixo é histórico e só vale se o Gemini for
+reutilizado para gerar exemplos.
 
 ### First Action
 Confirme primeiro que o ambiente continua de pé (não consome quota):
@@ -767,7 +856,10 @@ apareceram no balde.
 ### Constraints
 - Preservar as decisões aprovadas da seção 4.
 - Não renomear campos do contrato JSON.
-- Não trocar o modelo Gemini sem testar — ver seção 6.
+- Não trocar o modelo Gemini sem testar — ver seção 6. O padrão do código segue sendo o
+  Gemini; o provedor NVIDIA é opt-in por `LLM_PROVIDER`.
+- Em um `.env`, **cada variável deve aparecer uma só vez**: a última ocorrência vence e
+  anula a anterior em silêncio (ver Known Issues).
 - Não reverter `_texto_da_resposta()` em `app/agents/llm.py`.
 - Não criar recursos OCI fora da camada **Always Free**.
 - Não commitar `.env`, o `~/.oci/config` nem a chave privada `.pem`; guardá-los
@@ -780,8 +872,8 @@ apareceram no balde.
 - `GET /saude?profundo=true` reporta `oci` ativo e bucket acessível, sem aviso —
   **já atendido em 17/11**.
 - Uma execução do pipeline grava os dois objetos e retorna
-  `"status_upload": "concluido"` — **pendente, só falta cota**.
-- `.venv\Scripts\python.exe -m pytest tests -q` continua em 34 passed.
+  `"status_upload": "concluido"` — **atendido em 24/11** (5 execuções).
+- `.venv\Scripts\python.exe -m pytest tests -q` → 60 passed (na branch `feat/provedor-nvidia`).
 - Os 8 itens do checklist passam a estar verificados.
 
 ---

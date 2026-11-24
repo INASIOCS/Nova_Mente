@@ -129,8 +129,11 @@ def saude(profundo: bool = False) -> dict:
 
     return {
         "status": "ok",
+        "provedor_llm": cfg.provedor_llm,
+        "llm_configurado": cfg.llm_configurado,
         "gemini_configurado": cfg.gemini_configurado,
-        "modelo_llm": cfg.gemini_model,
+        "nvidia_configurado": cfg.nvidia_configurado,
+        "modelo_llm": cfg.modelo_llm_ativo,
         "caminho_llm": get_cliente_llm().caminho,
         "storage_backend_configurado": cfg.storage_backend,
         "storage_backend_ativo": storage.nome,

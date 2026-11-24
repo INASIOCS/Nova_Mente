@@ -1,0 +1,105 @@
+{
+  "cenario": {
+    "id": 4,
+    "descricao": "Ingestão de TEXTO BRUTO, adaptado para público executivo.",
+    "documento_fonte": "oci_object_storage_conceitos.txt",
+    "formato_ingestao": "texto",
+    "duracao_segundos": 19.3
+  },
+  "requisicao": {
+    "documento_titulo": "oci object storage conceitos",
+    "documento_conteudo": "ORACLE CLOUD INFRASTRUCTURE OBJECT STORAGE — CONCEITOS E OPERACOES\n\n1. VISAO GERAL\n\nO Object Storage da Oracle Cloud Infrastructure e um servico de armazenamento de\nobjetos altamente durave l e escalavel. Diferente de um sistema de arquivos\ntradicional, ele nao organiza os dados em uma hierarquia de diretorios reais:\narmazena cada arquivo como um objeto identificado por uma chave unica dentro de\num container chamado bucket.\n\nO servico e projetado para dados nao estruturados de qualquer tipo e tamanho:\ndocumentos, imagens, backups, logs, arquivos de dados analiticos e artefatos\ngerados por aplicacoes. Os dados sao replicados automaticamente para garantir\ndurabilidade, sem que o usuario precise configurar replicacao.\n\n2. NAMESPACE, COMPARTIMENTO E BUCKET\n\nTres conceitos organizam o servico:\n\n- Namespace: um identificador unico e global atribuido a cada tenancy no momento\n da criacao da conta. O namespace funciona como o container de mais alto nivel\n do Object Storage e nao pode ser alterado.\n\n- Compartimento: a unidade logica de organizacao e de controle de acesso da OCI.\n Buckets sao criados dentro de um compartimento, e as politicas de IAM concedem\n permissoes por compartimento.\n\n- Bucket: o container onde os objetos ficam armazenados. O nome do bucket deve\n ser unico dentro do namespace e da regiao. Um bucket pertence a uma unica\n regiao e nao pode ser movido para outra.\n\n3. OBJETOS E CHAVES\n\nCada objeto possui:\n\n- Um nome (tambem chamado de chave), que o identifica de forma unica no bucket.\n- O conteudo binario propriamente dito.\n- Metadados definidos pelo sistema, como tamanho, data de criacao e checksum.\n- Metadados opcionais definidos pelo usuario, enviados como pares chave-valor.\n- Um content type, que informa aos clientes como interpretar o conteudo.\n\nEmbora o Object Storage nao tenha diretorios de verdade, e pratica comum usar a\nbarra no nome do objeto para simular uma hierarquia. Um objeto chamado\n\"relatorios/2026/novembro/resumo.json\" aparece na console agrupado como se\nestivesse em pastas aninhadas, mas internamente a chave e apenas essa string.\nEsse padrao de prefixos tambem permite listar objetos por prefixo, o que e a\nforma eficiente de navegar em buckets com muitos objetos.\n\n4. CAMADAS DE ARMAZENAMENTO\n\nO servico oferece camadas com custos e caracteristicas de acesso diferentes:\n\n- Standard: para dados acessados com frequencia. Leitura imediata.\n- Infrequent Access: para dados acessados raramente. Custo de armazenamento mais\n baixo e custo de recuperacao mais alto.\n- Archive: para retencao de longo prazo. O objeto precisa ser restaurado antes de\n ser lido, operacao que leva tempo e nao e instantanea.\n\nA camada pode ser definida no bucket e, em alguns casos, por objeto. Regras de\nciclo de vida permitem mover objetos automaticamente entre camadas ou excluir\nobjetos antigos, com base no tempo desde a criacao.\n\n5. CONTROLE DE ACESSO\n\nPor padrao, um bucket e privado: nenhum acesso anonimo e permitido. O acesso pode\nser concedido de tres formas:\n\n- Politicas de IAM: concedem permissao a grupos de usuarios ou a principais de\n servico sobre buckets de um compartimento. E a forma recomendada para acesso\n programatico de aplicacoes.\n\n- Pre-Authenticated Request (PAR): gera uma URL temporaria que permite ler ou\n gravar um objeto especifico, ou todo um bucket, sem credenciais. A URL tem data\n de expiracao definida na criacao. E util para compartilhar um arquivo com\n alguem de fora ou permitir upload direto de um cliente. Qualquer pessoa com a\n URL tem o acesso concedido, portanto ela deve ser tratada como um segredo.\n\n- Acesso publico de leitura: pode ser habilitado no bucket, tornando os objetos\n legiveis por qualquer pessoa na internet. Deve ser usado com cautela e nunca\n para dados sensiveis.\n\n6. OPERACOES BASICAS VIA SDK\n\nO SDK do OCI para Python expoe o servico pela classe ObjectStorageClient. O fluxo\ntipico de uma aplicacao e:\n\n- Carregar a configuracao de autenticacao, normalmente a partir do arquivo de\n configuracao do OCI CLI, que contem o OCID do usuario, o OCID da tenancy, a\n impressao digital da chave de API, o caminho da chave privada e a regiao.\n- Instanciar o cliente do Object Storage com essa configuracao.\n- Obter o namespace da tenancy.\n- Chamar put_object para gravar, informando namespace, nome do bucket, nome do\n objeto e o corpo do conteudo.\n- Chamar get_object para ler, list_objects para listar e delete_object para\n excluir.\n\nQuando a aplicacao roda dentro da propria OCI, e preferivel usar Instance\nPrincipal ou Resource Principal em vez de chaves de API. Nesse modelo, a propria\ninstancia recebe uma identidade e as credenciais sao rotacionadas\nautomaticamente, eliminando a necessidade de distribuir e guardar chaves\nprivadas.\n\n7. UPLOAD DE ARQUIVOS GRANDES\n\nPara arquivos grandes, o Object Storage suporta upload em varias partes\n(multipart upload). O arquivo e dividido em partes enviadas de forma\nindependente, possivelmente em paralelo, e depois consolidadas em um unico\nobjeto. Alem de acelerar o envio, essa abordagem permite retomar um upload\ninterrompido reenviando apenas as partes que falharam.\n\n8. VERSIONAMENTO E PROTECAO DE DADOS\n\nO versionamento pode ser habilitado por bucket. Com ele ativo, sobrescrever um\nobjeto nao destroi o conteudo anterior: uma nova versao e criada e as anteriores\ncontinuam recuperaveis. Isso protege contra sobrescrita acidental e contra\nexclusao indevida, ao custo de mais espaco consumido.\n\nA replicacao entre regioes pode ser configurada para copiar automaticamente os\nobjetos de um bucket para um bucket em outra regiao, atendendo requisitos de\nrecuperacao de desastre.\n\n9. CAMADA ALWAYS FREE\n\nA Oracle oferece uma camada Always Free que inclui uma cota de Object Storage sem\ncusto, valida enquanto a conta existir. Os limites exatos de capacidade e de\nnumero de requisicoes constam na documentacao oficial da Oracle e podem mudar;\nantes de dimensionar uma solucao, convem conferir a pagina atual do programa.\n\nPara um projeto academico ou um prototipo, a recomendacao pratica e: usar um\nunico bucket na camada Standard, manter os objetos pequenos, evitar replicacao\nentre regioes e revisar periodicamente o consumo na console para garantir que a\nsolucao permanece dentro da gratuidade.\n\n10. BOAS PRATICAS\n\n- Use prefixos consistentes nos nomes dos objetos para organizar o bucket e\n permitir listagem eficiente por prefixo.\n- Nunca deixe um bucket com acesso publico de escrita.\n- Prefira Instance Principal ou Resource Principal a chaves de API quando a\n aplicacao roda na OCI.\n- Defina regras de ciclo de vida desde o inicio, para que dados antigos nao\n acumulem custo indefinidamente.\n- Habilite versionamento em buckets que guardam dados que nao podem ser perdidos.\n- Trate URLs de Pre-Authenticated Request como credenciais: elas concedem acesso\n a quem as possuir, ate a data de expiracao.",
+    "perfil_destinatario": "Gestor / Executivo (Não Técnico)",
+    "formato_saida": "Resumo Executivo",
+    "nicho_setor": "Saúde",
+    "nivel_detalhe": "Didatico"
+  },
+  "resposta": {
+    "status": "sucesso",
+    "metadados": {
+      "perfil_aplicado": "Gestor / Executivo (Não Técnico)",
+      "formato_gerado": "Resumo Executivo",
+      "tempo_estimado_estudo_minutos": 5,
+      "conceitos_chave": [
+        "Namespace",
+        "Compartimento",
+        "Bucket",
+        "Objeto"
+      ],
+      "pre_requisitos": [
+        "Noções básicas de computação em nuvem"
+      ]
+    },
+    "conteudo_adaptado": {
+      "titulo": "Armazenamento de Objetos Oracle Cloud: Segurança e Custo para Saúde",
+      "introducao_contextualizada": "O armazenamento de objetos na Oracle Cloud Infrastructure (OCI) oferece uma forma escalável e durável de guardar dados na nuvem, dispensando a gestão de servidores físicos. No setor de saúde, isso significa garantir a disponibilidade de prontuários e imagens de exames com alta segurança e controle de custos.",
+      "itens": [
+        {
+          "topico": "Estrutura de armazenamento (Buckets e Objetos)",
+          "descricao": "Dados são armazenados como 'objetos' dentro de 'buckets', em vez de pastas tradicionais. Cada objeto tem uma chave única que o identifica. Na saúde, isso permite organizar prontuários digitais e imagens de forma lógica, usando prefixes (ex: 'pacientes/2026/') para simular pastas sem perder a performance de um sistema de objetos puros.",
+          "impacto_negocio": "Simplifica a organização de grandes volumes de dados e facilita a recuperação de informações, dispensando a manutenção de infraestrutura de arquivos."
+        },
+        {
+          "topico": "Controle de Acesso e Segurança",
+          "descricao": "O acesso é gerenciado por compartimentos e políticas IAM, permitindo definir quem pode ler ou gravar dados. Para dados de saúde sensíveis, é crucial evitar o acesso público e utilizar URLs temporárias (Pre-Authenticated Requests) para compartilhar arquivos com terceiros de forma controlada e temporária.",
+          "impacto_negocio": "Garante compliance com normas de proteção de dados (como LGPD/HIPAA), reduzindo o risco de vazar informações de pacientes e controlando quem tem acesso aos dados críticos."
+        },
+        {
+          "topico": "Camadas de Armazenamento e Custos",
+          "descricao": "O serviço oferece diferentes camadas de armazenamento com custos variáveis, otimizando o gasto dependendo de quão frequentemente os dados são acessados. Dados de exames antigos, por exemplo, podem ser movidos para camadas de menor custo, enquanto dados ativos permanecem em camadas de acesso rápido.",
+          "impacto_negocio": "Permite otimizar o orçamento de TI, pagando apenas pelo nível de acesso necessário, evitando gastos desnecessários com armazenamento de dados raramente acessados."
+        },
+        {
+          "topico": "Versionamento e Proteção de Dados",
+          "descricao": "O versionamento pode ser ativado nos buckets, impedindo que sobrescritas ou exclusões acidentais destruam o histórico de um arquivo. Isso funciona como um 'passaporte' para versões anteriores de um documento ou imagem, essencial para recuperação de desastres.",
+          "impacto_negocio": "Protegerá a instituição contra perda de dados por erro humano, garantindo a integridade dos registros médicos e reduzindo custos com backup emergencial."
+        },
+        {
+          "topico": "Camada Always Free",
+          "descricao": "A Oracle oferece uma camada gratuita de armazenamento, válida enquanto a conta existir, com limites específicos de capacidade e requisições. É uma oportunidade de testar o serviço ou armazenar dados de baixo custo sem impacto orçamentário imediato.",
+          "impacto_negocio": "Reduz o risco financeiro inicial para projetos piloto ou armazenamento de dados de arquivo, permitindo iniciar operações sem custo operacional fixo."
+        }
+      ]
+    },
+    "avaliacao_qualidade": {
+      "ancoragem_fonte_score": 0.56,
+      "clareza_pedagogica": "Alta",
+      "observacoes": "O material traduz bem os conceitos para linguagem de negócio, mas introduz a ideia de 'chave única' sem citar a fonte original, o que configura uma pequena extrapolação de linguagem. Não há fatos inventados, apenas uma reformulação que poderia ser mais explicitamente ancorada. Verificação léxica: cobertura léxica de 30%; 2 identificador(es) sem respaldo (LGPD, HIPAA)."
+    },
+    "armazenamento_oci": {
+      "bucket": "novamente-conteudos-educativos",
+      "objeto_id": "conteudos/oci-object-storage-conceitos-gestor-executivo-nao-resumo-executivo-fde2e1.json",
+      "status_upload": "concluido",
+      "backend": "oci",
+      "uri": "https://objectstorage.sa-saopaulo-1.oraclecloud.com/n/gr6m1uqnjub1/b/novamente-conteudos-educativos/o/conteudos/oci-object-storage-conceitos-gestor-executivo-nao-resumo-executivo-fde2e1.json"
+    }
+  },
+  "diagnostico_pipeline": {
+    "trace": [
+      "orquestrador: LangGraph (grafo de decisão)",
+      "roteador: plano gerado (nvidia:nvidia/nemotron-3.5-lightning-30b-a3b)",
+      "pesquisador_rag: 7 chunks indexados em chromadb · embeddings nvidia:nvidia/nemotron-3.5-embed-1b · 5 trechos recuperados (sim. média 0.3342)",
+      "redator_pedagogico: material gerado (primeira versão) com 5 itens",
+      "critico_revisor: score final 0.6 (LLM 0.75 · léxico 0.315) · clareza Alta",
+      "roteador: devolvendo para revisão (rodada 1)",
+      "redator_pedagogico: material gerado (revisão 1) com 5 itens",
+      "critico_revisor: score final 0.56 (LLM 0.75 · léxico 0.22) · clareza Alta",
+      "storage: documento original -> concluido (originais/oci-object-storage-conceitos-txt-d4954d.txt)"
+    ],
+    "backend_llm": "nvidia:nvidia/nemotron-3.5-lightning-30b-a3b",
+    "backend_embeddings": "nvidia:nvidia/nemotron-3.5-embed-1b",
+    "backend_vetorial": "chromadb",
+    "backend_storage": "oci",
+    "chunks_indexados": 7,
+    "trechos_recuperados": 5,
+    "similaridade_media": 0.3342,
+    "rodadas_de_revisao": 1,
+    "estatisticas_chunks": {
+      "total_chunks": 7,
+      "media_caracteres": 1106.1,
+      "min": 861,
+      "max": 1346
+    },
+    "avisos": []
+  }
+}

@@ -202,30 +202,46 @@ def _duracao_legivel(segundos: int) -> str:
     return f"{minutos} min"
 
 
-def painel_de_cota(segundos: int | None) -> None:
-    """Explica o 429 do Gemini em vez de despejar o erro da API na tela.
+def painel_de_cota(segundos: int | None, provedor: str = "Gemini") -> None:
+    """Explica o 429 do provedor em vez de despejar o erro da API na tela.
 
-    O tempo vem do `retry_delay` da própria resposta, então a mensagem continua
-    correta em qualquer dia: não há data nem horário fixo no código.
+    O tempo vem do `retry_delay` (Gemini) ou do `Retry-After` (NVIDIA) da própria
+    resposta, então a mensagem continua correta em qualquer dia: não há data nem
+    horário fixo no código.
     """
     if segundos:
         volta = datetime.now(FUSO_BRASILIA) + timedelta(seconds=segundos)
         quando = (
-            f"A cota volta por volta das **{volta:%H:%M}** "
+            f"O limite volta por volta das **{volta:%H:%M}** "
             f"(horário de Brasília), em cerca de {_duracao_legivel(segundos)}."
         )
+    elif provedor == "NVIDIA":
+        quando = "O limite da NVIDIA é por minuto: tente de novo em cerca de um minuto."
     else:
         quando = (
             "A cota volta à meia-noite no horário do Pacífico — **05:00** em "
             "Brasília."
         )
 
+    if provedor == "NVIDIA":
+        explicacao = (
+            "O endpoint gratuito da NVIDIA limita as requisições por minuto, e o "
+            "limite é compartilhado por todos que usam a mesma chave. "
+        )
+        titulo = "**O limite de requisições da NVIDIA foi atingido.**"
+    else:
+        explicacao = (
+            "O plano gratuito permite 20 gerações por dia para o projeto inteiro, "
+            "e não por pessoa. "
+        )
+        titulo = "**A cota diária do Gemini acabou.**"
+
     st.warning(
-        "**A cota diária do Gemini acabou.**\n\n"
-        "O plano gratuito permite 20 gerações por dia para o projeto inteiro, "
-        "e não por pessoa. Isto não é uma falha do NovaMente: o pipeline parou "
-        "na primeira recusa da API, de propósito, porque toda tentativa — "
-        "inclusive a que falha — consome o saldo do dia.\n\n"
+        f"{titulo}\n\n"
+        f"{explicacao}"
+        "Isto não é uma falha do NovaMente: o pipeline parou na primeira recusa "
+        "da API, de propósito, porque toda tentativa — inclusive a que falha — "
+        "consome o saldo.\n\n"
         f"{quando}"
     )
 
@@ -326,10 +342,11 @@ with st.sidebar:
 
     st.divider()
     st.subheader("Ambiente")
-    if cfg.gemini_configurado:
-        st.success(f"Gemini configurado · `{cfg.gemini_model}`")
+    if cfg.llm_configurado:
+        st.success(f"{cfg.nome_provedor_llm} configurado · `{cfg.modelo_llm_ativo}`")
     else:
-        st.error("GOOGLE_API_KEY ausente — defina no arquivo `.env`.")
+        variavel = "NVIDIA_API_KEY" if cfg.provedor_llm == "nvidia" else "GOOGLE_API_KEY"
+        st.error(f"{variavel} ausente — defina no arquivo `.env`.")
     st.caption(
         f"Persistência: `{cfg.storage_backend}` · bucket `{cfg.oci_bucket_name}`"
     )
@@ -470,11 +487,13 @@ if gerar and documento is not None:
                 if getattr(exc, "cota_esgotada", False):
                     # Não é erro do sistema: é o limite diário da API. O painel
                     # logo abaixo explica e oferece um material já gerado.
+                    provedor = getattr(exc, "provedor", "Gemini")
                     status.update(
-                        label="Cota diária do Gemini esgotada", state="error"
+                        label=f"Limite da API {provedor} atingido", state="error"
                     )
                     st.session_state["quota_esgotada"] = {
-                        "segundos": getattr(exc, "segundos", None)
+                        "segundos": getattr(exc, "segundos", None),
+                        "provedor": provedor,
                     }
                 else:
                     status.update(label="Erro inesperado", state="error")
@@ -483,7 +502,7 @@ if gerar and documento is not None:
 
 cota_esgotada = st.session_state.get("quota_esgotada")
 if cota_esgotada is not None:
-    painel_de_cota(cota_esgotada.get("segundos"))
+    painel_de_cota(cota_esgotada.get("segundos"), cota_esgotada.get("provedor", "Gemini"))
 
 
 # ---------------------------------------------------------------------------

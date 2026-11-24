@@ -1,0 +1,67 @@
+[
+  {
+    "id": 1,
+    "slug": "vcn-iniciante-flashcards",
+    "status": "ok",
+    "fonte": "oci_vcn_arquitetura_de_redes.md",
+    "formato_ingestao": "markdown",
+    "perfil": "Iniciante",
+    "formato": "Flashcards",
+    "itens": 5,
+    "ancoragem": 0.66,
+    "clareza": "Alta",
+    "duracao_segundos": 30.9
+  },
+  {
+    "id": 2,
+    "slug": "vcn-arquiteto-resumo-executivo",
+    "status": "ok",
+    "fonte": "oci_vcn_arquitetura_de_redes.md",
+    "formato_ingestao": "markdown",
+    "perfil": "Líder Técnico / Arquiteto",
+    "formato": "Resumo Executivo",
+    "itens": 4,
+    "ancoragem": 0.72,
+    "clareza": "Alta",
+    "duracao_segundos": 27.5
+  },
+  {
+    "id": 3,
+    "slug": "vcn-desenvolvedor-quiz",
+    "status": "ok",
+    "fonte": "oci_vcn_arquitetura_de_redes.md",
+    "formato_ingestao": "markdown",
+    "perfil": "Desenvolvedor Júnior / Pleno",
+    "formato": "Quiz",
+    "itens": 5,
+    "ancoragem": 0.84,
+    "clareza": "Alta",
+    "duracao_segundos": 18.3
+  },
+  {
+    "id": 4,
+    "slug": "object-storage-gestor-resumo",
+    "status": "ok",
+    "fonte": "oci_object_storage_conceitos.txt",
+    "formato_ingestao": "texto",
+    "perfil": "Gestor / Executivo (Não Técnico)",
+    "formato": "Resumo Executivo",
+    "itens": 5,
+    "ancoragem": 0.56,
+    "clareza": "Alta",
+    "duracao_segundos": 19.3
+  },
+  {
+    "id": 5,
+    "slug": "iam-desenvolvedor-tutorial",
+    "status": "ok",
+    "fonte": "oci_iam_identidade_e_politicas.pdf",
+    "formato_ingestao": "pdf",
+    "perfil": "Desenvolvedor Júnior / Pleno",
+    "formato": "Tutorial",
+    "itens": 8,
+    "ancoragem": 0.55,
+    "clareza": "Média",
+    "duracao_segundos": 26.1
+  }
+]
