@@ -1,7 +1,7 @@
 # Project Handoff — NovaMente
 
 **Last Updated:** 2026-11-24 (horário local do sistema, Windows)
-**Status:** ACTIVE — MVP funcional e testado; OCI Object Storage **verificado de ponta a ponta pelo pipeline** (24/11); provedor NVIDIA implementado e comparado em branch separada, **ainda não mesclada**
+**Status:** ACTIVE — MVP funcional e testado; OCI Object Storage **verificado de ponta a ponta pelo pipeline** (24/11); provedor NVIDIA **mesclado em `main`** (3388082); o app da nuvem aguarda **Reboot + segredos**
 **Project:** NovaMente — Sistema Inteligente de Adaptação e Geração de Conteúdo Educacional
 **Contexto:** Hackathon ONE G10 — Projeto 1 — Oracle Next Education & Alura
 **Project Root:** `C:\Users\inasio\OneDrive\Área de Trabalho\Projeto_Nova_Mente`
@@ -182,6 +182,9 @@ do pipeline completo
 - `.streamlit/secrets.toml.example` é o modelo versionado (sem valores).
 - Verificado no ar: a interface carrega e o aviso de cota aparece corretamente.
 
+**Estado em 24/11:** o push de 3388082 deixou o app com `AttributeError` até o Reboot
+(ver Workflow do Provedor NVIDIA). **Confirmar com o usuário que ele reiniciou o app.**
+
 **Regra operacional — não esquecer**
 - Todo commit que mexa em arquivo **fora** de `ui/app.py` exige **Reboot app**
   no painel. Ver o Finding sobre o cache de módulos, na seção 6.
@@ -256,8 +259,8 @@ do pipeline completo
 
 ---
 
-### Workflow: Provedor NVIDIA (branch `feat/provedor-nvidia`)
-**Status:** IMPLEMENTED + TESTED + comparado; **não mesclado em `main`** — decisão do usuário
+### Workflow: Provedor NVIDIA (mesclado em `main`, commit 3388082, 24/11)
+**Status:** IMPLEMENTED + TESTED + comparado + **mesclado e enviado ao GitHub**; **falta o Reboot do app na nuvem e colar os segredos da NVIDIA** (ações do usuário)
 
 **Por que existe:** o free tier do Gemini limita a 5 req/min e 20/dia. O endpoint gratuito da
 NVIDIA (build.nvidia.com, API compatível com OpenAI) tem limite por minuto bem maior
@@ -296,9 +299,15 @@ NVIDIA (build.nvidia.com, API compatível com OpenAI) tem limite por minuto bem 
   de modelos diferentes, não indicam por si só recuperação pior.
 - Modelos testados e descartados como padrão: ver seção 9.
 
-**Pending (decisão do usuário)**
-- Mesclar ou não em `main`. Se mesclar, o app publicado **continua no Gemini** até que
-  `LLM_PROVIDER` seja definido nos segredos da Streamlit Cloud.
+**Pending (ações do usuário, no painel da Streamlit Cloud)**
+- **Em 24/11 o app público estava quebrado** logo após o push: `AttributeError` em
+  `cfg.llm_configurado` (`ui/app.py`, linha 345) — a interface nova lendo um
+  `app/core/config.py` antigo em cache. É o mesmo cache de módulos da seção 6; a cura é
+  *Manage app → Reboot app*. O agente **não** tem sessão no `share.streamlit.io`.
+- Para o app usar a NVIDIA, colar em *Settings → Secrets* (o valor da chave é do usuário):
+  `LLM_PROVIDER = "nvidia"`, `NVIDIA_API_KEY = "nvapi-..."`, `NVIDIA_MODEL` e
+  `NVIDIA_EMBEDDING_MODEL`. Salvar os segredos reinicia o app e já resolve o Reboot.
+  Sem `LLM_PROVIDER`, o app permanece no Gemini.
 - Ajustar o limite de revisão, se o Nemotron for adotado.
 
 ---
@@ -814,8 +823,9 @@ Teste rápido de autenticação do OCI, sem subir a aplicação:
 ## 14. Next Session — Start Here [P0]
 
 ### Immediate Objective
-**Perguntar ao usuário** o estado da entrega (o prazo de 22/11 passou) e se a branch
-`feat/provedor-nvidia` deve ser mesclada em `main`. O item 6, que era o objetivo desta
+**Perguntar ao usuário** o estado da entrega (o prazo de 22/11 passou) e se ele já fez o
+Reboot do app na nuvem e colou os segredos da NVIDIA (a branch `feat/provedor-nvidia` já foi
+mesclada em `main`). O item 6, que era o objetivo desta
 seção, **já está fechado** (24/11); o texto abaixo é histórico e só vale se o Gemini for
 reutilizado para gerar exemplos.
 
